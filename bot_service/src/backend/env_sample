@@ -1,0 +1,88 @@
+OPENAI_API_KEY='sk-pQ57tPnLk52qfilx2gMebHmtMA'
+OPENAI_MODEL_NAME="gpt-4o"
+OPENAI_EMBEDDING_MODEL_NAME="text-embedding-3-small"
+OPENAI_CONTEXT_WINDOW=128000
+
+AZURE_API_KEY="df"
+AZURE_API_TYPE="adcf"
+AZURE_API_BASE="asdca"
+AZURE_API_VERSION="asc"
+AZURE_DEPLOYMENT_NAME="asca"
+AZURE_EMBEDDING_DEPLOYMENT_NAME="acs"
+AZURE_MODEL_NAME="cas"
+
+PERPLEXITY_API_KEY=""
+PERPLEXITY_MODEL_NAME=""
+PERPLEXITY_API_BASE=""
+
+ANTHROPIC_API_KEY=""
+ANTHROPIC_MODEL_NAME=""
+
+GEMINI_API_KEY="AIza1pII"
+GEMINI_MODEL_NAME="gemini-1.5-flash-002"
+
+#API handler
+API_CONFIG_FILE=""
+OPENAPI_SPEC_DIR="./store/api_specs"
+
+# Tranformation filter keys files
+FILTER_KEYS_DIR="./store/transformation_filters"
+
+# Json file containting user credentials
+USER_DIRECTORY="./etc/user_credentials.json"
+MONGODB_HOST="localhost"
+# MONGODB_HOST="mongodb-service"
+MONGODB_PORT=27017
+MONGODB_USERNAME="root"
+MONGODB_PASSWORD="root"
+MONGODB_DB="chat"
+
+POSTGRES_USERNAME="root"
+POSTGRES_PASSWRD="root"
+POSTGRES_HOST="localhost"
+POSTGRES_PORT=5432
+POSTGRES_DB="PCR_LOCAL"
+POSTGRES_APP_SCHEMA="AI_BOT"
+
+PINECONE_API_KEY="d82289"
+PINECONE_INDEX="indextext"
+PINECONE_NAMESPACE="local_testing_namespace"
+PINECONE_SPEC_CLOUD="aws"
+PINECONE_SPEC_REGION="us-east-1"
+PINECONE_METRIC="cosine"
+PINECONE_DIMENSION=1536
+PINECONE_TIMEOUT=10
+
+
+# Common configuration
+MAX_RETRIES=3
+CONTEXT_WINDOW=5
+
+CONFIG_INI_PATH="./etc/config.ini"
+
+# Random secret, can be obtained using `python3 -m chainlit create-secret`
+CHAINLIT_AUTH_SECRET=""
+ANONYMIZED_TELEMETRY=False
+
+# Langfuse config
+LANGFUSE_ENV='LOCAL_RAHUL'
+LANGFUSE_PUBLIC_KEY="pk-lf-01be07f2b3c2"
+LANGFUSE_SECRET_KEY="sk-lf-707e99f62f53"
+LANGFUSE_HOST="https://promptanalytics.newtuple.com"
+
+
+POCKETBASE_URL="http://localhost:5004"
+# POCKETBASE_URL="http://pocketbase:5004"
+POCKETBASE_ADMIN_USERNAME=admin@admin.com
+POCKETBASE_ADMIN_PASSWORD=admin@admin
+
+# SQLAlchemy database migration URL for Alembic
+#SQLALCHEMY_DATABASE_MIGRATION_URL="mssql+pyodbc://sa:#password123sdJwnwlk@localhost:1433/COMMON?TrustServerCertificate=yes&application_name=PEOS&driver=ODBC+Driver+18+for+SQL+Server"
+SQLALCHEMY_DATABASE_MIGRATION_URL="postgresql://root:root@localhost:5432/COMMON"
+
+# Observability config
+ENABLE_JSON_LOGGER=1
+ENABLE_OTEL_COLLECTOR=1
+OTEL_AGENT_HOSTNAME=localhost
+OTEL_HTTP_AGENT_PORT=4318
+OTEL_GRPC_AGENT_PORT=4317

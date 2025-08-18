@@ -1,0 +1,125 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        files: \.py$
+        
+      - id: end-of-file-fixer
+        files: \.py$
+        
+      - id: check-yaml
+        args: ['--unsafe']
+        exclude: ^infra/
+        
+      - id: check-case-conflict
+        
+      - id: debug-statements
+        
+      - id: check-merge-conflict
+        
+      - id: check-added-large-files
+        
+      - id: check-ast
+        
+      - id: check-json
+        
+      - id: check-toml
+        
+      - id: requirements-txt-fixer
+        
+      # - id: no-commit-to-branch
+      #   args:
+      #     [
+      #       "--branch",
+      #       "main",
+      #       "--pattern",
+      #       "^(feature|bugfix|improvement|library|prerelease|release|hotfix)\_[a-z0-9._-]+$",
+      #     ]
+        
+
+  # - repo: https://github.com/astral-sh/ruff-pre-commit
+  #   rev: v0.7.4
+  #   hooks:
+  #       - id: ruff
+  #         args: [--fix]
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        args: ["--line-length=250","--target-version=py311"]
+        
+
+  - repo: https://github.com/pycqa/isort
+    rev: 6.0.0
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+        
+
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.8.0
+  #   # # type: ignore can be used to suspress mypy checks
+  #   hooks:
+  #     - id: mypy
+        # args: [--show-error-codes, --ignore-missing-imports]
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.1.1
+    # noqa or # noqa: E234 can be used to suspress flake8 checks
+    hooks:
+      - id: flake8
+        additional_dependencies:
+            - flake8-async
+        args: [
+          "--select=ASYNC",
+          "--max-line-length=250",
+          "--ignore=E305,ASYNC104,ASYNC103",
+          "--max-complexity=10",
+          "--filename=*.py",
+          "--extend-exclude=./bot_service/src/chainlit_data_pers/*.py",
+          "--extend-exclude=./bot_service/src/backend/tests/integration_tests/*.py",
+        ]
+        
+
+  # - repo: https://github.com/pycqa/pydocstyle
+  #   rev: 6.1.1
+  #   hooks:
+  #     - id: pydocstyle
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+        - id: codespell
+          additional_dependencies:
+              - tomli
+          files: \.py$
+
+          
+
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: 'v2.14'  # or any later Vulture version
+    hooks:
+      - id: vulture
+        args: [
+          ".",
+          "--min-confidence=61",
+          "--exclude=/src/chainlit_data_pers/"
+        ]
+        
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.7.0  
+    hooks:
+      - id: interrogate
+        args: [-vv, -I, --fail-under=80, --omit-covered-files, --ignore-init-method, --ignore-init-module, --exclude=versions, --ignore-module]
+        exclude: ^init/
+        pass_filenames: false
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.2
+    hooks:
+      - id: bandit
+        args: [ --exclude, /tests ]
