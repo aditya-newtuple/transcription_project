@@ -196,6 +196,15 @@ class ObservabilityConfiguration(BaseModel):
     otel_grpc_agent_port: int
 
 
+class TranscriberConfiguration(BaseModel):
+    """Represents the Transcriber service configuration"""
+
+    model_name: str = "large-v2"
+    device: str = "cpu"
+    compute_type: str = "int8"
+    models_directory: Optional[str] = None
+
+
 class Configuration(BaseModel):
     """Represents the configuration"""
 
@@ -215,6 +224,8 @@ class Configuration(BaseModel):
     sqlserver_configuration: SQLServerConfiguration
     sqlite_configuration: SQLiteConfiguration
     opensearch_configuration: OpenSearchConfiguration
+    
+    transcriber_configuration: TranscriberConfiguration
 
     pinecone_configuration: PineconeConfiguation
 

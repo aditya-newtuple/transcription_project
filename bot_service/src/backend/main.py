@@ -21,6 +21,8 @@ from health.manager import HealthServiceManager
 from LLM.manager import LLMServiceManager
 from metrics.controller import MetricsRestController
 from metrics.manager import MetricsService
+from transcriber.controller import TranscriberRestController
+from transcriber.manager import TranscriberServiceManager
 from user.controller import UserRestController
 from user.db_models import UserModelService
 from user.manager import UserServiceManager
@@ -57,6 +59,11 @@ user_db_model_service = UserModelService(database_service_manager)
 user_service_manager = UserServiceManager(user_db_model_service, config)
 user_rest_controller = UserRestController(user_service_manager, database_service_manager)
 user_rest_controller.prepare(app_router)
+
+# Initialize transcriber service with configuration from environment
+transcriber_service_manager = TranscriberServiceManager(config_env.transcriber_configuration)
+transcriber_rest_controller = TranscriberRestController(transcriber_service_manager)
+transcriber_rest_controller.prepare(app_router)
 
 metrics_service_manager = MetricsService()
 metrics_rest_controller = MetricsRestController(metrics_service_manager).prepare(app_router, Depends(user_rest_controller.get_current_username))

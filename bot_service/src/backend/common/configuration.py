@@ -69,11 +69,11 @@ class Configuration:
                 "db": os.environ.get("MONGODB_DB", "SAMPLE_MONGODB_DB"),
             },
             "postgresql_configuration": {
-                "host": os.environ.get("POSTGRES_HOST"),
-                "port": int(os.environ.get("POSTGRES_PORT")),
-                "username": os.environ.get("POSTGRES_USERNAME"),
-                "password": os.environ.get("POSTGRES_PASSWRD"),
-                "db": os.environ.get("POSTGRES_DB"),
+                "host": os.environ.get("POSTGRES_HOST", "localhost"),
+                "port": int(os.environ.get("POSTGRES_PORT", "5432")),
+                "username": os.environ.get("POSTGRES_USERNAME", "root"),
+                "password": os.environ.get("POSTGRES_PASSWRD", "root"),
+                "db": os.environ.get("POSTGRES_DB", "Transcriber_local"),
                 "app_schema": os.environ.get("POSTGRES_APP_SCHEMA", "public"),
             },
             "sqlserver_configuration": {
@@ -111,10 +111,20 @@ class Configuration:
                 "otel_http_agent_port": int(os.environ.get("OTEL_HTTP_AGENT_PORT", 4318)),
                 "otel_grpc_agent_port": int(os.environ.get("OTEL_GRPC_AGENT_PORT", 4317)),
             },
+            "transcriber_configuration": {
+                "model_name": os.environ.get("TRANSCRIBER_MODEL_NAME", "large-v2"),
+                "device": os.environ.get("TRANSCRIBER_DEVICE", "cpu"),
+                "compute_type": os.environ.get("TRANSCRIBER_COMPUTE_TYPE", "int8"),
+                "models_directory": os.environ.get("TRANSCRIBER_MODELS_DIR", None),
+            },
         }
         self._configuration = ConfigurationModel(**config_obj)
         self._config = configparser.ConfigParser()  # Read the config.ini file
-        self._config.read(os.environ.get("CONFIG_INI_PATH"))
+
+        # Only try to read config.ini if the path is provided and file exists
+        config_ini_path = os.environ.get("CONFIG_INI_PATH")
+        if config_ini_path and os.path.exists(config_ini_path):
+            self._config.read(config_ini_path)
 
     def configuration(self):
         """Returns the configuration"""
