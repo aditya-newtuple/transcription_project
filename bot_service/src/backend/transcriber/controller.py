@@ -1,14 +1,17 @@
 import shutil
 import os
 from pathlib import Path
+from typing import List
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
 from common.logger import logger
 from transcriber.manager import TranscriberServiceManager
-from transcriber.models.interface import TranscriptionResponse
+from transcriber.models.interface import BulkTranscriptionResponse, TranscriptionResult
 
 
 class TranscriberRestController:
     """Implements the transcriber REST controller"""
+
+    ALLOWED_EXTENSIONS = {".mp3", ".mp4", ".mpeg", ".mpeg4"}
 
     def __init__(self, transcriber_service_manager: TranscriberServiceManager) -> None:
         """
@@ -56,58 +59,79 @@ class TranscriberRestController:
             "/transcribe",
             status_code=status.HTTP_200_OK,
             tags=["transcriber"],
-            response_model=TranscriptionResponse
+            response_model=BulkTranscriptionResponse
         )
         async def transcribe(
-            file: UploadFile = File(...)
-        ) -> TranscriptionResponse:
+            files: List[UploadFile] = File(...)
+        ) -> BulkTranscriptionResponse:
             """
-            Upload an audio/video file and transcribe it.
+            Upload one or more audio/video files and transcribe them.
             
             Args:
-                file: Audio/video file to transcribe
+                files: List of audio/video files to transcribe
                 
             Returns:
-                Transcription response containing paths to generated files
+                Bulk transcription response with results for each file
             """
+            if not files:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No files were provided for transcription."
+                )
+
+            for file in files:
+                file_ext = Path(file.filename).suffix.lower()
+                if file_ext not in self.ALLOWED_EXTENSIONS:
+                    logger.error("Unsupported file format attempted", exc_info=True)
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"File '{file.filename}' has an unsupported format. "
+                               f"Allowed formats are: {', '.join(self.ALLOWED_EXTENSIONS)}"
+                    )
+            
+            transcription_results = []
+            
             try:
                 # Ensure directories exist before processing
                 self._ensure_directories()
-                
-                # Save the uploaded file
-                input_file_path = self.input_directory / file.filename
-                with input_file_path.open("wb") as buffer:
-                    shutil.copyfileobj(file.file, buffer)
-                
-                logger.info("Audio file saved for transcription", 
-                          extra={
-                              "input_path": str(input_file_path),
-                              "original_name": file.filename
-                          })
 
-                # Transcribe the file with fixed parameters
-                text_file_path, subtitle_file_path = self.transcriber_service_manager.transcribe_file(
-                    input_file=input_file_path,
-                    output_directory=self.output_directory,
-                    beam_size=5,  # Fixed default value
-                    use_vad=True  # Fixed default value
-                )
+                for file in files:
+                    # Save the uploaded file
+                    input_file_path = self.input_directory / file.filename
+                    with input_file_path.open("wb") as buffer:
+                        shutil.copyfileobj(file.file, buffer)
+                    
+                    logger.info("Audio file saved for transcription", 
+                              extra={
+                                  "input_path": str(input_file_path),
+                                  "original_name": file.filename
+                              })
 
-                # Get language detection info from the last transcription
-                detected_language = "unknown"  # TODO: Get from transcriber
-                language_confidence = 0.0      # TODO: Get from transcriber
+                    # Transcribe the file
+                    text_file_path, subtitle_file_path, transcription_info = self.transcriber_service_manager.transcribe_file(
+                        input_file=input_file_path,
+                        output_directory=self.output_directory,
+                        beam_size=5,
+                        use_vad=True
+                    )
 
-                return TranscriptionResponse(
-                    message="File transcribed successfully",
-                    text_file_path=str(text_file_path),
-                    subtitle_file_path=str(subtitle_file_path),
-                    detected_language=detected_language,
-                    language_confidence=language_confidence
+                    # Create result object
+                    result = TranscriptionResult(
+                        text_file_path=str(text_file_path),
+                        subtitle_file_path=str(subtitle_file_path),
+                        detected_language=transcription_info.language,
+                        language_confidence=transcription_info.language_probability
+                    )
+                    transcription_results.append(result)
+
+                return BulkTranscriptionResponse(
+                    message="All files transcribed successfully",
+                    results=transcription_results
                 )
 
             except Exception as error:
                 logger.error("Transcription failed", exc_info=error)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=str(error)
+                    detail=f"An error occurred during transcription: {error}"
                 )

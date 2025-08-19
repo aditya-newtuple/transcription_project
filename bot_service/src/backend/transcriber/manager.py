@@ -108,7 +108,7 @@ class TranscriberServiceManager:
         output_directory: Path,
         beam_size: int = 5,
         use_vad: bool = True
-    ) -> Tuple[Path, Path]:
+    ) -> Tuple[Path, Path, object]:
         """
         Transcribe an audio/video file and generate .txt and .srt outputs.
         
@@ -119,7 +119,7 @@ class TranscriberServiceManager:
             use_vad: Whether to use voice activity detection (default: True)
             
         Returns:
-            Tuple of (text_file_path, subtitle_file_path) for the generated output files
+            Tuple of (text_file_path, subtitle_file_path, transcription_info)
         """
         if not hasattr(self, "model") or self.model is None:
             raise RuntimeError("Model not initialized")
@@ -165,7 +165,7 @@ class TranscriberServiceManager:
                        "subtitle_file": subtitle_file_path.name
                    })
         
-        return text_file_path, subtitle_file_path
+        return text_file_path, subtitle_file_path, transcription_info
 
     def _download_model(self, model_name: str, download_directory: Path) -> None:
         """Download model files to the specified directory."""
