@@ -36,7 +36,7 @@ class TranscriptionWorker:
         try:
             job_id = job_data.get("job_id")
             file_path = job_data.get("file_path")
-            output_formats = job_data.get("output_formats", ["txt"])
+            output_formats = job_data.get("output_formats", ["txt","srt"])
             
             logger.info(f"Processing job {job_id} for file {file_path}")
             

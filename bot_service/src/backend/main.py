@@ -16,6 +16,7 @@ from health.controller import HealthRestController
 from health.manager import HealthServiceManager
 from metrics.controller import MetricsRestController
 from metrics.manager import MetricsService
+from transcriber.controller import router as transcriber_router
 from transcriber.controller import TranscriberRestController
 from user.controller import UserRestController
 from user.manager import UserServiceManager
@@ -74,7 +75,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
 app.include_router(app_router, prefix="/v1/api")
+app.include_router(transcriber_router)  # This already has the /v1/api prefix
 
 if __name__ == "__main__":
     uvicorn.run(

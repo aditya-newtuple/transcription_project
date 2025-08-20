@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 
 
@@ -18,21 +18,108 @@ class BulkTranscriptionResponse(BaseModel):
 
 
 from datetime import datetime
+from enum import Enum
+from typing import List, Optional
+from pydantic import BaseModel, Field
 
+class JobStatus(str, Enum):
+    CREATED = 'created'
+    QUEUED = 'queued'
+    RUNNING = 'running'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+    CANCELED = 'canceled'
 
-class BulkTranscriptionRequestResponse(BaseModel):
-    """Response model for the asynchronous transcription request"""
-    batch_id: str = Field(..., description="A unique ID for the batch of transcription jobs")
-    job_ids: List[str] = Field(..., description="A list of job IDs for each uploaded file")
+class FileStatus(str, Enum):
+    QUEUED = 'queued'
+    RUNNING = 'running'
+    SUCCEEDED = 'succeeded'
+    FAILED = 'failed'
+    CANCELED = 'canceled'
 
+class TranscriptFormat(str, Enum):
+    TXT = 'txt'
+    SRT = 'srt'
 
-class JobStatusResponse(BaseModel):
-    """Response model for the job status endpoint"""
-    id: str
-    batch_id: str
-    status: str
-    original_filename: str
-    processed_file_path: Optional[str] = None
-    output_file_path: Optional[str] = None
+# Request Models
+class CreateJobRequest(BaseModel):
+    title: Optional[str] = None
+    notes: Optional[str] = None
+
+class CreateFileRequest(BaseModel):
+    job_id: int
+    sequence_no: Optional[int] = None
+    language_hint: Optional[str] = None
+
+class CreateTranscriptRequest(BaseModel):
+    file_id: int
+    format: TranscriptFormat
+    content: str
+    version: Optional[int] = Field(default=1, ge=1)
+
+class ApproveTranscriptRequest(BaseModel):
+    approved_by: int
+
+# Response Models
+class JobResponse(BaseModel):
+    id: int
+    created_by: int
+    status: JobStatus
+    title: Optional[str]
+    notes: Optional[str]
+    total_count: int
+    queued_count: int
+    running_count: int
+    succeeded_count: int
+    failed_count: int
+    skipped_count: int
     created_at: datetime
-    updated_at: datetime
+    started_at: Optional[datetime]
+    finished_at: Optional[datetime]
+    error_summary: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class FileResponse(BaseModel):
+    id: int
+    job_id: int
+    created_by: int
+    sequence_no: Optional[int]
+    source_name: Optional[str]
+    source_path: Optional[str]
+    source_mime: Optional[str]
+    source_bytes: Optional[int]
+    source_uploaded_at: datetime
+    source_deleted_at: Optional[datetime]
+    status: FileStatus
+    queued_at: datetime
+    started_at: Optional[datetime]
+    finished_at: Optional[datetime]
+    error_message: Optional[str]
+    language_hint: Optional[str]
+    duration_sec: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+class TranscriptResponse(BaseModel):
+    id: int
+    file_id: int
+    version: int
+    format: TranscriptFormat
+    content: Optional[str]
+    created_at: datetime
+    created_by: Optional[int]
+    approved_at: Optional[datetime]
+    approved_by: Optional[int]
+    is_approved: bool
+
+    class Config:
+        from_attributes = True
+
+class JobWithFilesResponse(JobResponse):
+    files: List[FileResponse] = []
+
+class FileWithTranscriptsResponse(FileResponse):
+    transcripts: List[TranscriptResponse] = []

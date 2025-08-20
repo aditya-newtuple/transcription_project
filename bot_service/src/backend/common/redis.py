@@ -24,6 +24,14 @@ class RedisManager:
             decode_responses=True
         )
         self.queue_name = self.redis_config.queue_name
+        
+        # Disable persistence to avoid disk write issues
+        try:
+            self.redis_client.config_set('save', '')
+            self.redis_client.config_set('appendonly', 'no')
+            logger.info("Redis persistence disabled")
+        except Exception as e:
+            logger.warning(f"Could not disable Redis persistence: {str(e)}")
 
     def enqueue_job(self, job_data: dict[str, Any]) -> str:
         """

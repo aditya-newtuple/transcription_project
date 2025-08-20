@@ -209,10 +209,10 @@ class ObservabilityConfiguration(BaseModel):
 class TranscriberConfiguration(BaseModel):
     """Represents the Transcriber service configuration"""
 
-    model_name: str = "large-v2"
-    device: str = "cpu"
-    compute_type: str = "int8"
-    models_directory: Optional[str] = None
+    model_name: str
+    device: str
+    compute_type: str
+    models_directory: Optional[str]
 
 
 class Configuration(BaseModel):

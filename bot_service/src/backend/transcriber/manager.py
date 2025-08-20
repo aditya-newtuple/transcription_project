@@ -1,16 +1,24 @@
 import os
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from uuid import uuid4
+from datetime import datetime
 
 from faster_whisper import WhisperModel
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from common.logger import get_logger
 from common.configuration import Configuration
 from common.data_model import TranscriberConfiguration
 from database.manager import DatabaseServiceManager
-from transcriber.db_models import TranscriptionJob
+from transcriber.db_models import TranscriptionJob, Job, File, Transcript
+from transcriber.models.interface import (
+    CreateJobRequest, CreateFileRequest, CreateTranscriptRequest,
+    JobResponse, FileResponse, TranscriptResponse,
+    JobWithFilesResponse, FileWithTranscriptsResponse,
+    JobStatus, FileStatus
+)
 
 logger = get_logger(__name__)
 
@@ -38,15 +46,22 @@ class TranscriberManager:
         # Initialize model
         self._initialize_model()
 
-    def create_job(self, file_path: str, output_formats: List[str] = ["txt", "srt"]) -> str:
+    def create_job(self, file_path: str, output_formats: List[str] = ["txt", "srt"], 
+                batch_id: Optional[str] = None, original_filename: Optional[str] = None,
+                output_directory: Optional[str] = None) -> str:
         """Create a new transcription job in the database"""
         job_id = str(uuid4())
         
+        # Use provided output directory or default to input file's parent directory
+        output_dir = output_directory if output_directory else str(Path(file_path).parent)
+        
         job = TranscriptionJob(
             id=job_id,
+            batch_id=batch_id,
             status="pending",
+            original_filename=original_filename,
             processed_file_path=file_path,
-            output_file_path=str(Path(file_path).parent / "output")
+            output_file_path=output_dir
         )
         
         try:
@@ -85,42 +100,80 @@ class TranscriberManager:
             if not job:
                 raise ValueError(f"Job {job_id} not found")
             
+            # Ensure we have absolute paths
+            input_file = Path(file_path).resolve()
+            output_dir = Path(job.output_file_path).resolve()
+            
+            logger.info(f"Processing file: {input_file}")
+            logger.info(f"Output directory: {output_dir}")
+            
             # Create output directory
-            output_dir = Path(job.output_file_path).parent
             output_dir.mkdir(parents=True, exist_ok=True)
             
+            # Get original filename without job_id prefix and extension
+            original_name = Path(job.original_filename if job.original_filename else input_file.name).stem
+            if "_" in original_name:  # Remove job_id prefix if present
+                original_name = original_name.split("_", 1)[1]
+            
+            logger.info(f"Using base filename: {original_name}")
+            
             # Run transcription
+            logger.info("Starting transcription...")
             segments, info = self.model.transcribe(
-                str(file_path),
+                str(input_file),
                 beam_size=5,
                 vad_filter=True
             )
+            logger.info("Transcription completed")
+            
+            # Convert segments to list and ensure it's not empty
+            segments_list = list(segments)
+            if not segments_list:
+                raise ValueError("No transcription segments generated")
+            
+            logger.info(f"Generated {len(segments_list)} segments")
             
             # Generate outputs
             output_files = {}
             
+            # Generate TXT file
             if "txt" in output_formats:
-                txt_path = output_dir / f"{Path(file_path).stem}.txt"
+                txt_path = output_dir / f"{original_name}.txt"
+                logger.info(f"Creating TXT file: {txt_path}")
                 with open(txt_path, "w", encoding="utf-8") as f:
-                    for segment in segments:
+                    for segment in segments_list:
                         f.write(f"{segment.text.strip()}\n")
                 output_files["txt"] = str(txt_path)
+                logger.info(f"TXT file created successfully")
             
+            # Generate SRT file
             if "srt" in output_formats:
-                srt_path = output_dir / f"{Path(file_path).stem}.srt"
+                srt_path = output_dir / f"{original_name}.srt"
+                logger.info(f"Creating SRT file: {srt_path}")
                 with open(srt_path, "w", encoding="utf-8") as f:
-                    for i, segment in enumerate(segments, 1):
-                        f.write(f"{i}\n")
-                        f.write(f"{format_srt_timestamp(segment.start)} --> {format_srt_timestamp(segment.end)}\n")
-                        f.write(f"{segment.text.strip()}\n\n")
+                    for i, segment in enumerate(segments_list, 1):
+                        # Write SRT entry
+                        f.write(f"{i}\n")  # Subtitle number
+                        f.write(f"{format_srt_timestamp(segment.start)} --> {format_srt_timestamp(segment.end)}\n")  # Timestamps
+                        f.write(f"{segment.text.strip()}\n")  # Text
+                        f.write("\n")  # Empty line between entries
                 output_files["srt"] = str(srt_path)
+                logger.info(f"SRT file created successfully")
+            
+            # Verify files were created
+            for fmt, path in output_files.items():
+                if not Path(path).exists():
+                    raise FileNotFoundError(f"Failed to create {fmt.upper()} file at {path}")
+                logger.info(f"Verified {fmt.upper()} file exists: {path}")
             
             # Update job with output paths
-            job.output_file_path = str(output_files.get("srt", output_files.get("txt")))
+            job.output_files = output_files  # Store all output paths
+            job.output_file_path = str(output_dir)  # Keep directory path for backward compatibility
             job.status = "completed"
             self.db_session.commit()
             
             logger.info(f"Successfully processed job {job_id}")
+            logger.info(f"Output files: {output_files}")
             
         except Exception as e:
             logger.error(f"Failed to process job {job_id}: {str(e)}")
@@ -209,3 +262,202 @@ class TranscriberManager:
         return directory_path.is_dir() and all(
             (directory_path / file).exists() for file in self.REQUIRED_MODEL_FILES
         )
+
+class TranscriptionManager:
+    def __init__(self, db: Session):
+        self.db = db
+
+    # Job methods
+    def create_job(self, request: CreateJobRequest, created_by: int) -> JobResponse:
+        job = Job(
+            created_by=created_by,
+            title=request.title,
+            notes=request.notes,
+            status=JobStatus.CREATED
+        )
+        self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
+        return JobResponse.from_orm(job)
+
+    def get_job(self, job_id: int) -> Optional[JobWithFilesResponse]:
+        job = self.db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return None
+        return JobWithFilesResponse.from_orm(job)
+
+    def list_jobs(self, created_by: Optional[int] = None, status: Optional[JobStatus] = None) -> List[JobResponse]:
+        query = self.db.query(Job)
+        if created_by is not None:
+            query = query.filter(Job.created_by == created_by)
+        if status is not None:
+            query = query.filter(Job.status == status)
+        return [JobResponse.from_orm(job) for job in query.all()]
+
+    def update_job_status(self, job_id: int, status: JobStatus) -> Optional[JobResponse]:
+        job = self.db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return None
+        
+        job.status = status
+        if status == JobStatus.RUNNING and not job.started_at:
+            job.started_at = datetime.utcnow()
+        elif status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELED):
+            job.finished_at = datetime.utcnow()
+        
+        self.db.commit()
+        self.db.refresh(job)
+        return JobResponse.from_orm(job)
+
+    def update_job_counts(self, job_id: int) -> Optional[JobResponse]:
+        """Update job progress counters based on file statuses"""
+        job = self.db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return None
+
+        # Count files by status
+        files = self.db.query(File).filter(File.job_id == job_id).all()
+        job.total_count = len(files)
+        job.queued_count = sum(1 for f in files if f.status == FileStatus.QUEUED)
+        job.running_count = sum(1 for f in files if f.status == FileStatus.RUNNING)
+        job.succeeded_count = sum(1 for f in files if f.status == FileStatus.SUCCEEDED)
+        job.failed_count = sum(1 for f in files if f.status == FileStatus.FAILED)
+        job.skipped_count = sum(1 for f in files if f.status == FileStatus.CANCELED)
+
+        # Auto-update job status based on file statuses
+        if job.total_count == 0:
+            job.status = JobStatus.CREATED
+        elif job.failed_count > 0:
+            job.status = JobStatus.FAILED
+        elif job.total_count == job.succeeded_count + job.skipped_count:
+            job.status = JobStatus.COMPLETED
+        elif job.running_count > 0:
+            job.status = JobStatus.RUNNING
+        elif job.queued_count > 0:
+            job.status = JobStatus.QUEUED
+
+        self.db.commit()
+        self.db.refresh(job)
+        return JobResponse.from_orm(job)
+
+    # File methods
+    def create_file(self, request: CreateFileRequest, created_by: int) -> FileResponse:
+        file = File(
+            job_id=request.job_id,
+            created_by=created_by,
+            sequence_no=request.sequence_no,
+            language_hint=request.language_hint,
+            status=FileStatus.QUEUED
+        )
+        self.db.add(file)
+        self.db.commit()
+        self.db.refresh(file)
+        
+        # Update job counts
+        self.update_job_counts(request.job_id)
+        
+        return FileResponse.from_orm(file)
+
+    def update_file_paths(self, file_id: int, source_path: str, source_name: str, source_mime: str, source_bytes: int) -> Optional[FileResponse]:
+        """Update file paths and metadata after upload"""
+        file = self.db.query(File).filter(File.id == file_id).first()
+        if not file:
+            return None
+
+        file.source_path = source_path
+        file.source_name = source_name
+        file.source_mime = source_mime
+        file.source_bytes = source_bytes
+        file.source_uploaded_at = datetime.utcnow()
+
+        self.db.commit()
+        self.db.refresh(file)
+        return FileResponse.from_orm(file)
+
+    def get_file(self, file_id: int) -> Optional[FileWithTranscriptsResponse]:
+        file = self.db.query(File).filter(File.id == file_id).first()
+        if not file:
+            return None
+        return FileWithTranscriptsResponse.from_orm(file)
+
+    def list_files(self, job_id: Optional[int] = None, status: Optional[FileStatus] = None) -> List[FileResponse]:
+        query = self.db.query(File)
+        if job_id is not None:
+            query = query.filter(File.job_id == job_id)
+        if status is not None:
+            query = query.filter(File.status == status)
+        return [FileResponse.from_orm(file) for file in query.all()]
+
+    def update_file_status(self, file_id: int, status: FileStatus, error_message: Optional[str] = None) -> Optional[FileResponse]:
+        file = self.db.query(File).filter(File.id == file_id).first()
+        if not file:
+            return None
+
+        file.status = status
+        if error_message is not None:
+            file.error_message = error_message
+
+        if status == FileStatus.RUNNING and not file.started_at:
+            file.started_at = datetime.utcnow()
+        elif status in (FileStatus.SUCCEEDED, FileStatus.FAILED, FileStatus.CANCELED):
+            file.finished_at = datetime.utcnow()
+
+        self.db.commit()
+        self.db.refresh(file)
+        
+        # Update job counts
+        self.update_job_counts(file.job_id)
+        
+        return FileResponse.from_orm(file)
+
+    # Transcript methods
+    def create_transcript(self, request: CreateTranscriptRequest, created_by: int) -> TranscriptResponse:
+        transcript = Transcript(
+            file_id=request.file_id,
+            version=request.version,
+            format=request.format,
+            content=request.content,
+            created_by=created_by
+        )
+        self.db.add(transcript)
+        self.db.commit()
+        self.db.refresh(transcript)
+        return TranscriptResponse.from_orm(transcript)
+
+    def get_transcript(self, transcript_id: int) -> Optional[TranscriptResponse]:
+        transcript = self.db.query(Transcript).filter(Transcript.id == transcript_id).first()
+        if not transcript:
+            return None
+        return TranscriptResponse.from_orm(transcript)
+
+    def list_transcripts(self, file_id: Optional[int] = None, is_approved: Optional[bool] = None) -> List[TranscriptResponse]:
+        query = self.db.query(Transcript)
+        if file_id is not None:
+            query = query.filter(Transcript.file_id == file_id)
+        if is_approved is not None:
+            query = query.filter(Transcript.is_approved == is_approved)
+        return [TranscriptResponse.from_orm(t) for t in query.all()]
+
+    def approve_transcript(self, transcript_id: int, approved_by: int) -> Optional[TranscriptResponse]:
+        # Start a transaction
+        transcript = self.db.query(Transcript).filter(Transcript.id == transcript_id).first()
+        if not transcript:
+            return None
+
+        # First, un-approve any other transcripts for this file/format
+        self.db.query(Transcript).filter(
+            and_(
+                Transcript.file_id == transcript.file_id,
+                Transcript.format == transcript.format,
+                Transcript.id != transcript_id
+            )
+        ).update({"is_approved": False})
+
+        # Then approve this one
+        transcript.is_approved = True
+        transcript.approved_by = approved_by
+        transcript.approved_at = datetime.utcnow()
+
+        self.db.commit()
+        self.db.refresh(transcript)
+        return TranscriptResponse.from_orm(transcript)

@@ -73,7 +73,7 @@ class Configuration:
                 "port": int(os.environ.get("POSTGRES_PORT", "5433")),
                 "username": os.environ.get("POSTGRES_USERNAME", "root"),
                 "password": os.environ.get("POSTGRES_PASSWRD", "root"),
-                "db": os.environ.get("POSTGRES_DB", "Transcriber_local"),
+                "db": os.environ.get("POSTGRES_DB", "transcriber_local_db"),
                 "app_schema": os.environ.get("POSTGRES_APP_SCHEMA", "public"),
             },
             "sqlserver_configuration": {

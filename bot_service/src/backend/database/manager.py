@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Generator
 
 from common.configuration import Configuration
 from common.data_model import (  # SQLServerConfiguration,
@@ -21,8 +21,22 @@ from sqlalchemy.exc import (
     SQLAlchemyError,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker, Session
 from sqlalchemy.schema import CreateTable
+
+# Create Base class for SQLAlchemy models
+Base = declarative_base()
+
+# Create SessionLocal class for database sessions
+SessionLocal = sessionmaker(autocommit=False, autoflush=False)
+
+def get_db() -> Generator[Session, None, None]:
+    """Dependency for getting database sessions"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 class OpenSearchDBService:
@@ -495,6 +509,10 @@ class DatabaseServiceManager:
         self._redis_service = RedisManager(config)
         # self._sqlserver_db_service = SQLServerDBService(config)
         self._sqlite_db_service = SQLiteDBService(config)
+
+        # Initialize the main database engine and bind it to SessionLocal
+        global SessionLocal
+        SessionLocal.configure(bind=self._postgres_db_service.engine)
 
     def postgres_db_service(self) -> PostgresDBService:
         """Get the Postgres database service."""
