@@ -4,9 +4,8 @@ from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
-from auth.deps import get_current_user
 from common.configuration import Configuration
 from common.logger import get_logger
 from common.models import FileStatus
@@ -59,9 +58,9 @@ class FilesRestController:
         )
         async def enqueue_transcription(
             files: List[UploadFile] = File(...),
-            current_user_id: int = Depends(get_current_user),
+            current_user_id: int = 1
         ):
-            job_manager = JobManager(self.job_manager)
+            job_manager = JobManager(self.file_manager)
             if not files:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -136,7 +135,7 @@ class FilesRestController:
             job_id: int = Form(...),
             sequence_no: Optional[int] = Form(None),
             language_hint: Optional[str] = Form(None),
-            current_user_id: int = Depends(get_current_user)
+            current_user_id: int = 1
         ):
             request = CreateFileRequest(
                 job_id=job_id,
@@ -149,7 +148,7 @@ class FilesRestController:
         @app.get("/files/{file_id}", tags=["files"], response_model=FileWithTranscriptsResponse)
         def get_file(
             file_id: int,
-            current_user_id: int = Depends(get_current_user)
+            current_user_id: int = 1
         ):
             file = self.file_manager.get_file(file_id)
             if not file:
@@ -160,7 +159,7 @@ class FilesRestController:
         def list_files(
             job_id: Optional[int] = None,
             status: Optional[FileStatus] = None,
-            current_user_id: int = Depends(get_current_user)
+            current_user_id: int = 1
         ):
             return self.file_manager.list_files(job_id, status)
 
@@ -169,7 +168,7 @@ class FilesRestController:
             file_id: int,
             status: FileStatus,
             error_message: Optional[str] = None,
-            current_user_id: int = Depends(get_current_user)
+            current_user_id: int = 1
         ):
             file = self.file_manager.update_file_status(file_id, status, error_message)
             if not file:

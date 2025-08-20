@@ -24,7 +24,7 @@ target_metadata = [user_base.metadata, transcriber_base.metadata]
 load_dotenv("./etc/.env")
 
 # Construct database URL from environment variables
-db_url = f"postgresql://{os.getenv('POSTGRES_USERNAME', 'root')}:{os.getenv('POSTGRES_PASSWRD', 'root')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5433')}/{os.getenv('POSTGRES_DB', 'Transcriber_local')}"
+db_url = f"postgresql://{os.getenv('POSTGRES_USERNAME', 'root')}:{os.getenv('POSTGRES_PASSWRD', 'root')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5433')}/{os.getenv('POSTGRES_DB', 'transcriber_local_db')}"
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""

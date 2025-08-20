@@ -15,7 +15,7 @@ def format_srt_timestamp(seconds: float) -> str:
     return f"{hours:02}:{minutes:02}:{seconds_part:02},{milliseconds:03}"
 
 
-class TranscriberServiceManager:
+class TranscriberManager:
     """
     Manages the Faster-Whisper transcription service with automatic model handling:
     
@@ -38,7 +38,7 @@ class TranscriberServiceManager:
         self.config = config
         
         # Resolve models directory path
-        workspace_root = Path(os.getcwd()).resolve()
+        workspace_root = Path.cwd().resolve()
         etc_directory = workspace_root / "etc"
         self.models_directory = Path(config.models_directory or (etc_directory / "models")).resolve()
         self.model_instance_directory = (self.models_directory / config.model_name).resolve()

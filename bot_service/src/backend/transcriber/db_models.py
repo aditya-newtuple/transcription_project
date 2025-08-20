@@ -106,9 +106,9 @@ class TranscriptionJobModelService:
         self.current_db = self.database_manager.postgres_db_service()
         self.current_db_engine = self.current_db.engine
 
-        try:
-            if Base:
-                logger.info("Creating base tables for transcription jobs..")
-                Base.metadata.create_all(bind=self.current_db_engine)
-        except Exception as e:
-            logger.error(f"Could not create base tables for transcription jobs due to {e}")
+        # try:
+        #     if Base:
+        #         logger.info("Creating base tables for transcription jobs..")
+        #         Base.metadata.create_all(bind=self.current_db_engine)
+        # except Exception as e:
+        #     logger.error(f"Could not create base tables for transcription jobs due to {e}")

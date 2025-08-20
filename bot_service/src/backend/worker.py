@@ -5,10 +5,17 @@ import sys
 import time
 from typing import Optional
 
+from pathlib import Path
 from common.configuration import Configuration
 from common.logger import get_logger
 from common.redis import RedisManager
+from database.manager import DatabaseServiceManager
+from files.db_models import FileModelService, FileStatus
+from jobs.db_models import JobModelService
 from transcriber.manager import TranscriberManager
+from transcripts.db_models import TranscriptModelService
+from transcripts.models.request import CreateTranscriptRequest
+from common.models import TranscriptFormat
 
 logger = get_logger(__name__)
 
@@ -17,9 +24,22 @@ class TranscriptionWorker:
 
     def __init__(self):
         """Initialize worker"""
-        self.config = Configuration()
-        self.redis_manager = RedisManager(self.config)
-        self.transcriber_manager = TranscriberManager(self.config)
+        config = Configuration()
+        self.config = config.configuration()
+        
+        self.redis_manager = RedisManager(config)
+        
+        database_service_manager = DatabaseServiceManager(config)
+        self.job_model_service = JobModelService(database_service_manager)
+        self.file_model_service = FileModelService(database_service_manager)
+        self.transcript_model_service = TranscriptModelService(database_service_manager)
+        
+        self.transcriber_manager = TranscriberManager(self.config.transcriber_configuration)
+        
+        # Define and create output directory
+        workspace_root = Path.cwd().resolve()
+        self.output_directory = workspace_root / "etc" / "output"
+        self.output_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
         self.should_exit = False
         
         # Set up signal handlers
@@ -33,26 +53,70 @@ class TranscriptionWorker:
 
     def process_job(self, job_data: dict) -> None:
         """Process a single transcription job"""
+        job_id = job_data.get("job_id")
+        file_id = job_data.get("file_id")
+
+        if not job_id or not file_id:
+            logger.error("Invalid job data received", extra={"job_data": job_data})
+            return
+
         try:
-            job_id = job_data.get("job_id")
-            file_path = job_data.get("file_path")
-            output_formats = job_data.get("output_formats", ["txt","srt"])
+            # Get file details from the database
+            db_file = self.file_model_service.get_file(file_id)
+            if not db_file:
+                raise RuntimeError(f"File with ID {file_id} not found in the database.")
             
-            logger.info(f"Processing job {job_id} for file {file_path}")
+            logger.info(f"Processing file {db_file.source_name} for job {job_id}")
             
-            # Call transcriber manager to process the file
-            self.transcriber_manager.process_file(
-                file_path=file_path,
-                job_id=job_id,
-                output_formats=output_formats
+            # Update file status to RUNNING
+            self.file_model_service.update_file_status(file_id, FileStatus.RUNNING)
+            self.job_model_service.update_job_counts(job_id)
+
+            # Transcribe the file
+            input_file_path = Path(db_file.source_path)
+            text_path, srt_path, _ = self.transcriber_manager.transcribe_file(
+                input_file=input_file_path,
+                output_directory=self.output_directory
+            )
+
+            # Read the output files and create transcript records
+            with text_path.open("r", encoding="utf-8") as f:
+                text_content = f.read()
+            
+            with srt_path.open("r", encoding="utf-8") as f:
+                srt_content = f.read()
+
+            # Create transcript records in the database
+            # TODO: Replace hardcoded user ID with actual user from auth
+            self.transcript_model_service.create_transcript(
+                CreateTranscriptRequest(
+                    file_id=file_id,
+                    format=TranscriptFormat.TXT,
+                    content=text_content
+                ),
+                created_by=1
+            )
+            self.transcript_model_service.create_transcript(
+                CreateTranscriptRequest(
+                    file_id=file_id,
+                    format=TranscriptFormat.SRT,
+                    content=srt_content
+                ),
+                created_by=1
             )
             
-            logger.info(f"Successfully processed job {job_id}")
-            
+            # Update file status to SUCCEEDED
+            self.file_model_service.update_file_status(file_id, FileStatus.SUCCEEDED)
+            logger.info(f"Successfully processed file {db_file.source_name} for job {job_id}")
+
         except Exception as e:
-            logger.error(f"Failed to process job {job_id}: {str(e)}")
-            # Update job status to failed in database
-            self.transcriber_manager.update_job_status(job_id, "failed", str(e))
+            logger.error(f"Failed to process file {file_id} for job {job_id}", exc_info=e)
+            # Update file status to FAILED
+            self.file_model_service.update_file_status(file_id, FileStatus.FAILED, str(e))
+        
+        finally:
+            # Always update the main job status
+            self.job_model_service.update_job_counts(job_id)
 
     def run(self) -> None:
         """Main worker loop"""

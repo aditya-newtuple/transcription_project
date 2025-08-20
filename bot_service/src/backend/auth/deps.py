@@ -1,15 +1,9 @@
 from typing import Optional
 from fastapi import Header, HTTPException, status
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> int:
+async def get_current_user() -> int:
     """
-    Dummy auth dependency that returns user ID=1 if Authorization header is present.
-    In production, this would validate the token and return the actual user.
+    Development-only dependency that always returns user ID=1.
+    No authorization checks are performed.
     """
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header is required"
-        )
-    # For now, just return a dummy user ID
-    return 1 
+    return 1  # Always return default user ID 
