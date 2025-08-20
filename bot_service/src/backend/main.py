@@ -16,13 +16,23 @@ from health.controller import HealthRestController
 from health.manager import HealthServiceManager
 from metrics.controller import MetricsRestController
 from metrics.manager import MetricsService
-from transcriber.controller import router as transcriber_router
-from transcriber.controller import TranscriberRestController
 from user.controller import UserRestController
 from user.manager import UserServiceManager
 from user.db_models import UserModelService
 from database.manager import DatabaseServiceManager
 from auth.manager import AuthManager
+from transcriber.manager import TranscriberServiceManager
+
+from transcriber.controller import TranscriberRestController
+from jobs.controller import JobsRestController
+from jobs.manager import JobManager
+from jobs.db_models import JobModelService
+from files.controller import FilesRestController
+from files.manager import FileManager
+from files.db_models import FileModelService
+from transcripts.controller import TranscriptsRestController
+from transcripts.manager import TranscriptManager
+from transcripts.db_models import TranscriptModelService
 
 logger = get_logger(__name__)
 
@@ -55,9 +65,30 @@ user_service_manager = UserServiceManager(user_db_model_service, config)
 user_rest_controller = UserRestController(user_service_manager, database_service_manager)
 user_rest_controller.prepare(app_router)
 
-# Transcription service
-transcriber_rest_controller = TranscriberRestController(config)
+
+# Initialize transcriber service with configuration from environment
+transcriber_service_manager = TranscriberServiceManager(config_env.transcriber_configuration)
+transcriber_rest_controller = TranscriberRestController(transcriber_service_manager)
 transcriber_rest_controller.prepare(app_router)
+
+
+# Jobs service
+job_model_service = JobModelService(database_service_manager)
+job_manager = JobManager(job_model_service)
+jobs_rest_controller = JobsRestController(job_manager)
+jobs_rest_controller.prepare(app_router)
+
+# Files service
+file_model_service = FileModelService(database_service_manager)
+file_manager = FileManager(file_model_service, job_manager)
+files_rest_controller = FilesRestController(file_manager, config)
+files_rest_controller.prepare(app_router)
+
+# Transcripts service
+transcript_model_service = TranscriptModelService(database_service_manager)
+transcript_manager = TranscriptManager(transcript_model_service)
+transcripts_rest_controller = TranscriptsRestController(transcript_manager)
+transcripts_rest_controller.prepare(app_router)
 
 # Metrics
 metrics_service_manager = MetricsService()
@@ -77,7 +108,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(app_router, prefix="/v1/api")
-app.include_router(transcriber_router)  # This already has the /v1/api prefix
 
 if __name__ == "__main__":
     uvicorn.run(

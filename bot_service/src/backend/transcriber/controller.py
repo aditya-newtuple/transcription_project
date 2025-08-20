@@ -1,37 +1,26 @@
 import shutil
 import os
 from pathlib import Path
-from typing import List, Optional
-from uuid import uuid4
+from typing import List
+from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from common.logger import logger
+from transcriber.manager import TranscriberServiceManager
+from transcriber.models.interface import BulkTranscriptionResponse, TranscriptionResult
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends, Form
-from sqlalchemy.orm import Session
-
-from common.configuration import Configuration
-from common.logger import get_logger
-from common.redis import RedisManager
-from database.manager import get_db
-from transcriber.models.interface import (
-    CreateJobRequest, CreateFileRequest, CreateTranscriptRequest, ApproveTranscriptRequest,
-    JobResponse, FileResponse, TranscriptResponse,
-    JobWithFilesResponse, FileWithTranscriptsResponse,
-    JobStatus, FileStatus
-)
-from transcriber.manager import TranscriptionManager
-
-logger = get_logger(__name__)
-
-router = APIRouter(prefix="/v1/api", tags=["transcription"])
 
 class TranscriberRestController:
     """Implements the transcriber REST controller"""
 
     ALLOWED_EXTENSIONS = {".mp3", ".mp4", ".mpeg", ".mpeg4"}
 
-    def __init__(self, config: Configuration) -> None:
-        """Initialize the transcriber REST controller"""
-        self.config = config
-        self.redis_manager = RedisManager(config)
+    def __init__(self, transcriber_service_manager: TranscriberServiceManager) -> None:
+        """
+        Initialize the transcriber REST controller.
+        
+        Args:
+            transcriber_service_manager: Service manager for transcription operations
+        """
+        self.transcriber_service_manager = transcriber_service_manager
         
         # Initialize directory paths
         workspace_root = Path(os.getcwd()).resolve()
@@ -45,256 +34,104 @@ class TranscriberRestController:
     def _ensure_directories(self) -> None:
         """Ensure input and output directories exist with proper permissions"""
         try:
-            # Create directories with proper permissions
             self.etc_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
             self.input_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
             self.output_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
             
-            # Verify directories are writable
-            if not os.access(self.input_directory, os.W_OK):
-                raise PermissionError(f"Input directory {self.input_directory} is not writable")
-            if not os.access(self.output_directory, os.W_OK):
-                raise PermissionError(f"Output directory {self.output_directory} is not writable")
-            
-            logger.info("Directories created and verified", extra={
-                "input_dir": str(self.input_directory),
-                "output_dir": str(self.output_directory),
-                "input_writable": os.access(self.input_directory, os.W_OK),
-                "output_writable": os.access(self.output_directory, os.W_OK)
-            })
-        except Exception as e:
-            logger.error(f"Failed to create or verify directories: {str(e)}")
-            raise
+            logger.info("Directories created/verified", 
+                       extra={
+                           "input_path": str(self.input_directory),
+                           "output_path": str(self.output_directory)
+                       })
+                       
+        except Exception as error:
+            logger.error("Failed to create required directories", exc_info=error)
+            raise RuntimeError(f"Failed to create required directories: {error}")
 
     def prepare(self, app: APIRouter) -> None:
-        """Register API routes"""
+        """
+        Prepare the transcriber REST controller by registering routes.
         
+        Args:
+            app: FastAPI router instance to register routes on
+        """
         @app.post(
-            "/transcriptions",
-            status_code=status.HTTP_202_ACCEPTED,
+            "/transcribe",
+            status_code=status.HTTP_200_OK,
             tags=["transcriber"],
-            response_model=JobWithFilesResponse,
+            response_model=BulkTranscriptionResponse
         )
-        async def enqueue_transcription(
-            files: List[UploadFile] = File(...),
-            db: Session = Depends(get_db),
-            current_user_id: int = 1
-        ) -> JobWithFilesResponse:
-            """Upload files and enqueue them for transcription"""
+        async def transcribe(
+            files: List[UploadFile] = File(...)
+        ) -> BulkTranscriptionResponse:
+            """
+            Upload one or more audio/video files and transcribe them.
+            
+            Args:
+                files: List of audio/video files to transcribe
+                
+            Returns:
+                Bulk transcription response with results for each file
+            """
             if not files:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No files were provided for transcription.",
+                    detail="No files were provided for transcription."
                 )
 
-            # Validate file extensions
             for file in files:
                 file_ext = Path(file.filename).suffix.lower()
                 if file_ext not in self.ALLOWED_EXTENSIONS:
+                    logger.error("Unsupported file format attempted", exc_info=True)
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"File '{file.filename}' has an unsupported format. "
-                        f"Allowed formats are: {', '.join(self.ALLOWED_EXTENSIONS)}",
+                               f"Allowed formats are: {', '.join(self.ALLOWED_EXTENSIONS)}"
                     )
-
+            
+            transcription_results = []
+            
             try:
-                # Create a new job
-                manager = TranscriptionManager(db)
-                job = manager.create_job(
-                    CreateJobRequest(
-                        title="Bulk Upload",
-                        notes=f"Uploaded {len(files)} files"
-                    ),
-                    current_user_id
-                )
+                # Ensure directories exist before processing
+                self._ensure_directories()
 
-                # Process each file
-                for idx, file in enumerate(files, 1):
-                    # Save file to disk
-                    unique_id = str(uuid4())
-                    input_file_path = self.input_directory / f"{unique_id}_{file.filename}"
-                    
-                    logger.info(f"Saving uploaded file to: {input_file_path}")
-                    
-                    # Save uploaded file
+                for file in files:
+                    # Save the uploaded file
+                    input_file_path = self.input_directory / file.filename
                     with input_file_path.open("wb") as buffer:
                         shutil.copyfileobj(file.file, buffer)
                     
-                    if not input_file_path.exists():
-                        raise FileNotFoundError(f"Failed to save uploaded file to {input_file_path}")
-                    
-                    logger.info(f"File saved successfully: {input_file_path}")
+                    logger.info("Audio file saved for transcription", 
+                              extra={
+                                  "input_path": str(input_file_path),
+                                  "original_name": file.filename
+                              })
 
-                    # Create file record
-                    file_record = manager.create_file(
-                        CreateFileRequest(
-                            job_id=job.id,
-                            sequence_no=idx,
-                            language_hint=None
-                        ),
-                        current_user_id
+                    # Transcribe the file
+                    text_file_path, subtitle_file_path, transcription_info = self.transcriber_service_manager.transcribe_file(
+                        input_file=input_file_path,
+                        output_directory=self.output_directory,
+                        beam_size=5,
+                        use_vad=True
                     )
 
-                    # Update file record with paths
-                    file_record = manager.update_file_paths(
-                        file_record.id,
-                        str(input_file_path),
-                        file.filename,
-                        file.content_type,
-                        os.path.getsize(input_file_path)
+                    # Create result object
+                    result = TranscriptionResult(
+                        text_file_path=str(text_file_path),
+                        subtitle_file_path=str(subtitle_file_path),
+                        detected_language=transcription_info.language,
+                        language_confidence=transcription_info.language_probability
                     )
+                    transcription_results.append(result)
 
-                    # Enqueue job in Redis
-                    self.redis_manager.enqueue_job({
-                        "file_id": file_record.id,
-                        "job_id": job.id,
-                        "input_path": str(input_file_path),
-                        "output_directory": str(self.output_directory)
-                    })
-                    logger.info(f"Enqueued file {file_record.id} in Redis")
-
-                # Get updated job with files
-                return manager.get_job(job.id)
-
-            except Exception as e:
-                logger.error(f"Failed to enqueue transcription jobs: {str(e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"An error occurred while enqueuing jobs: {str(e)}",
+                return BulkTranscriptionResponse(
+                    message="All files transcribed successfully",
+                    results=transcription_results
                 )
 
-# Job endpoints
-@router.post("/jobs", response_model=JobResponse)
-def create_job(
-    request: CreateJobRequest,
-    db: Session = Depends(get_db),
-    # TODO: Get actual user ID from auth
-    current_user_id: int = 1
-):
-    manager = TranscriptionManager(db)
-    return manager.create_job(request, current_user_id)
-
-@router.get("/jobs/{job_id}", response_model=JobWithFilesResponse)
-def get_job(job_id: int, db: Session = Depends(get_db)):
-    manager = TranscriptionManager(db)
-    job = manager.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return job
-
-@router.get("/jobs", response_model=List[JobResponse])
-def list_jobs(
-    created_by: Optional[int] = None,
-    status: Optional[JobStatus] = None,
-    db: Session = Depends(get_db)
-):
-    manager = TranscriptionManager(db)
-    return manager.list_jobs(created_by, status)
-
-@router.put("/jobs/{job_id}/status", response_model=JobResponse)
-def update_job_status(
-    job_id: int,
-    status: JobStatus,
-    db: Session = Depends(get_db)
-):
-    manager = TranscriptionManager(db)
-    job = manager.update_job_status(job_id, status)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return job
-
-# File endpoints
-@router.post("/files", response_model=FileResponse)
-async def create_file(
-    file: UploadFile = File(...),
-    job_id: int = Form(...),
-    sequence_no: Optional[int] = Form(None),
-    language_hint: Optional[str] = Form(None),
-    db: Session = Depends(get_db),
-    # TODO: Get actual user ID from auth
-    current_user_id: int = 1
-):
-    manager = TranscriptionManager(db)
-    
-    # Create file record
-    request = CreateFileRequest(
-        job_id=job_id,
-        sequence_no=sequence_no,
-        language_hint=language_hint
-    )
-    file_record = manager.create_file(request, current_user_id)
-    
-    # TODO: Handle file upload, processing, and status updates
-    # This should be done asynchronously via a worker
-    
-    return file_record
-
-@router.get("/files/{file_id}", response_model=FileWithTranscriptsResponse)
-def get_file(file_id: int, db: Session = Depends(get_db)):
-    manager = TranscriptionManager(db)
-    file = manager.get_file(file_id)
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-    return file
-
-@router.get("/files", response_model=List[FileResponse])
-def list_files(
-    job_id: Optional[int] = None,
-    status: Optional[FileStatus] = None,
-    db: Session = Depends(get_db)
-):
-    manager = TranscriptionManager(db)
-    return manager.list_files(job_id, status)
-
-@router.put("/files/{file_id}/status", response_model=FileResponse)
-def update_file_status(
-    file_id: int,
-    status: FileStatus,
-    error_message: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    manager = TranscriptionManager(db)
-    file = manager.update_file_status(file_id, status, error_message)
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-    return file
-
-# Transcript endpoints
-@router.post("/transcripts", response_model=TranscriptResponse)
-def create_transcript(
-    request: CreateTranscriptRequest,
-    db: Session = Depends(get_db),
-    # TODO: Get actual user ID from auth
-    current_user_id: int = 1
-):
-    manager = TranscriptionManager(db)
-    return manager.create_transcript(request, current_user_id)
-
-@router.get("/transcripts/{transcript_id}", response_model=TranscriptResponse)
-def get_transcript(transcript_id: int, db: Session = Depends(get_db)):
-    manager = TranscriptionManager(db)
-    transcript = manager.get_transcript(transcript_id)
-    if not transcript:
-        raise HTTPException(status_code=404, detail="Transcript not found")
-    return transcript
-
-@router.get("/transcripts", response_model=List[TranscriptResponse])
-def list_transcripts(
-    file_id: Optional[int] = None,
-    is_approved: Optional[bool] = None,
-    db: Session = Depends(get_db)
-):
-    manager = TranscriptionManager(db)
-    return manager.list_transcripts(file_id, is_approved)
-
-@router.post("/transcripts/{transcript_id}/approve", response_model=TranscriptResponse)
-def approve_transcript(
-    transcript_id: int,
-    request: ApproveTranscriptRequest,
-    db: Session = Depends(get_db)
-):
-    manager = TranscriptionManager(db)
-    transcript = manager.approve_transcript(transcript_id, request.approved_by)
-    if not transcript:
-        raise HTTPException(status_code=404, detail="Transcript not found")
-    return transcript
+            except Exception as error:
+                logger.error("Transcription failed", exc_info=error)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"An error occurred during transcription: {error}"
+                )
