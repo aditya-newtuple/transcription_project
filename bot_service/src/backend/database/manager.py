@@ -7,6 +7,7 @@ from common.data_model import (  # SQLServerConfiguration,
     SQLiteConfiguration,
 )
 from common.logger import logger
+from common.redis import RedisManager
 from exceptions.db import DBException
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from sqlalchemy import MetaData, create_engine
@@ -491,6 +492,7 @@ class DatabaseServiceManager:
     def __init__(self, config: Configuration):
         self._postgres_db_service = PostgresDBService(config)
         self._opensearch_db_service = OpenSearchDBService(config)
+        self._redis_service = RedisManager(config)
         # self._sqlserver_db_service = SQLServerDBService(config)
         self._sqlite_db_service = SQLiteDBService(config)
 
@@ -501,6 +503,10 @@ class DatabaseServiceManager:
     def opensearch_db_service(self) -> OpenSearchDBService:
         """Get the OpenSearch database service."""
         return self._opensearch_db_service
+
+    def redis_service(self) -> RedisManager:
+        """Get the Redis service."""
+        return self._redis_service
 
     # def sqlserver_db_service(self) -> SQLServerDBService:
     #     return self._sqlserver_db_service

@@ -431,9 +431,7 @@ pydantic-core==2.18.1
 pygments==2.19.1
     # via rich
 pyjwt==2.10.1
-    # via
-    #   -r requirements.txt
-    #   redis
+    # via -r requirements.txt
 pymongo==4.10.1
     # via -r requirements.txt
 pymupdf==1.25.1
@@ -480,8 +478,10 @@ pyyaml==6.0.2
     #   pre-commit
 rapidfuzz==3.11.0
     # via levenshtein
-redis==5.3.1
-    # via celery
+redis>=5.0.0
+    # via
+    #   -r requirements.txt
+    #   celery
 referencing==0.35.1
     # via
     #   jsonschema

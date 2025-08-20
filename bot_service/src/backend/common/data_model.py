@@ -138,6 +138,16 @@ class OpenSearchConfiguration(BaseModel):
     index_name: str
 
 
+class RedisConfiguration(BaseModel):
+    """Represents the Redis configuration"""
+
+    host: str
+    port: int
+    db: int
+    password: Optional[str] = None
+    queue_name: str = "transcription_jobs"
+
+
 class LangfuseConfiguration(BaseModel):
     """Represents the Langfuse configuration"""
 
@@ -224,6 +234,7 @@ class Configuration(BaseModel):
     sqlserver_configuration: SQLServerConfiguration
     sqlite_configuration: SQLiteConfiguration
     opensearch_configuration: OpenSearchConfiguration
+    redis_configuration: RedisConfiguration
     
     transcriber_configuration: TranscriberConfiguration
 

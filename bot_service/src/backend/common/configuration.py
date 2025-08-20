@@ -70,7 +70,7 @@ class Configuration:
             },
             "postgresql_configuration": {
                 "host": os.environ.get("POSTGRES_HOST", "localhost"),
-                "port": int(os.environ.get("POSTGRES_PORT", "5432")),
+                "port": int(os.environ.get("POSTGRES_PORT", "5433")),
                 "username": os.environ.get("POSTGRES_USERNAME", "root"),
                 "password": os.environ.get("POSTGRES_PASSWRD", "root"),
                 "db": os.environ.get("POSTGRES_DB", "Transcriber_local"),
@@ -116,6 +116,13 @@ class Configuration:
                 "device": os.environ.get("TRANSCRIBER_DEVICE", "cpu"),
                 "compute_type": os.environ.get("TRANSCRIBER_COMPUTE_TYPE", "int8"),
                 "models_directory": os.environ.get("TRANSCRIBER_MODELS_DIR", None),
+            },
+            "redis_configuration": {
+                "host": os.environ.get("REDIS_HOST", "localhost"),
+                "port": int(os.environ.get("REDIS_PORT", "6379")),
+                "db": int(os.environ.get("REDIS_DB", "0")),
+                "password": os.environ.get("REDIS_PASSWORD", None),
+                "queue_name": os.environ.get("REDIS_QUEUE_NAME", "transcription_jobs"),
             },
         }
         self._configuration = ConfigurationModel(**config_obj)

@@ -203,3 +203,9 @@ class Logger:
 _logger_instance = Logger()
 logger = _logger_instance.get_logger()
 tracer = _logger_instance.get_trace()
+
+def get_logger(name: str = None) -> logging.Logger:
+    """Get a logger instance"""
+    if name:
+        return logging.getLogger(name)
+    return logger

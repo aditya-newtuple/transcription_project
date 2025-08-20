@@ -45,3 +45,4 @@ tiktoken>=0.8.0
 uvicorn==0.23.2
 
 faster-whisper==0.10.0
+redis==5.0.1
