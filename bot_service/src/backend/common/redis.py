@@ -2,12 +2,32 @@
 
 import json
 from typing import Any, Optional
+import os
 
 import redis
 from common.configuration import Configuration
 from common.logger import get_logger
 
 logger = get_logger(__name__)
+
+def get_redis_connection():
+    """Get Redis connection based on environment"""
+    config = Configuration().configuration()
+    redis_config = config.redis_configuration
+
+    # Try to get Redis URL from environment first
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url:
+        return redis.Redis.from_url(redis_url)
+    
+    # Fallback to individual connection parameters
+    return redis.Redis(
+        host=redis_config.host,
+        port=redis_config.port,
+        db=redis_config.db,
+        password=redis_config.password,
+        decode_responses=True
+    )
 
 class RedisManager:
     """Redis connection manager"""
@@ -68,6 +88,6 @@ class RedisManager:
     def get_queue_length(self) -> int:
         """Get number of jobs in queue"""
         return self.redis_client.llen(self.queue_name)
-
 # Initialize Redis manager
 # redis_manager = RedisManager(Configuration())
+

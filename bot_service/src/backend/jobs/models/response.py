@@ -29,4 +29,4 @@ class JobResponse(BaseModel):
 
 
 class JobWithFilesResponse(JobResponse):
-    files: List[FileResponse] = []
+    files: List[FileResponse]

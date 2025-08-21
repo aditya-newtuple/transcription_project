@@ -81,14 +81,16 @@ class JobModelService:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             return db.query(Job).filter(Job.id == job_id).first()
 
-    def list_jobs(self, created_by: Optional[int] = None, status: Optional[JobStatus] = None) -> List[Job]:
+    def list_jobs(self, created_by: Optional[int] = None, status: Optional[JobStatus] = None, page_size: int = 10) -> List[Job]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             query = db.query(Job)
             if created_by is not None:
                 query = query.filter(Job.created_by == created_by)
             if status is not None:
                 query = query.filter(Job.status == status)
-            return query.all()
+            
+            # Apply pagination and return latest jobs first
+            return query.order_by(Job.created_at.desc()).limit(page_size).all()
 
     def update_job_status(self, job_id: int, status: JobStatus) -> Optional[Job]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:

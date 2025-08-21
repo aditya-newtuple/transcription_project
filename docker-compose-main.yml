@@ -10,6 +10,8 @@ services:
     environment:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - SQLALCHEMY_DATABASE_MIGRATION_URL=${SQLALCHEMY_DATABASE_MIGRATION_URL:-postgresql://root:root@pg-database:5432/transcriber_local_db}
+    volumes:
+      - ./bot_service/src/backend/etc:/app/backend/etc
     healthcheck:
       test: curl --fail http://localhost:8081/v1/api/health || exit 1
       interval: 40s
@@ -39,6 +41,8 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - RQ_WORKER_QUEUES=transcribe
       - SQLALCHEMY_DATABASE_MIGRATION_URL=${SQLALCHEMY_DATABASE_MIGRATION_URL:-postgresql://root:root@pg-database:5432/transcriber_local_db}
+    volumes:
+      - ./bot_service/src/backend/etc:/app/backend/etc
     networks:
       - shared_network
       - llm-network

@@ -266,23 +266,28 @@ class PostgresDBService:
     @contextmanager
     def get_custom_db_contxt_session(self, engine: Engine):
         """Creates a context with an open SQLAlchemy session."""
+        connection = None
+        db_session = None
         try:
             connection = engine.connect()
             db_session = scoped_session(sessionmaker(autocommit=False, autoflush=True, bind=engine, expire_on_commit=False))
             yield db_session
         except (OperationalError, SQLAlchemyError, ProgrammingError, NoSuchTableError, CompileError, DatabaseError, DBException) as e:
-            db_session.rollback()
+            if db_session:
+                db_session.rollback()
             raise DBException(f"Unable to perform PostgreSQL db operation due to error {e}, rolling back")
         finally:
             errors = []
-            try:
-                db_session.close()
-            except Exception as e:
-                errors.append(e)
-            try:
-                connection.close()
-            except Exception as e:
-                errors.append(e)
+            if db_session:
+                try:
+                    db_session.close()
+                except Exception as e:
+                    errors.append(e)
+            if connection:
+                try:
+                    connection.close()
+                except Exception as e:
+                    errors.append(e)
             if errors:
                 logger.error(f"Failed to close connection and session due to {errors}")
                 raise SQLAlchemyError(f"Failed to close connection and session due to {errors}")

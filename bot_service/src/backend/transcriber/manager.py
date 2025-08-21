@@ -15,7 +15,7 @@ def format_srt_timestamp(seconds: float) -> str:
     return f"{hours:02}:{minutes:02}:{seconds_part:02},{milliseconds:03}"
 
 
-class TranscriberManager:
+class TranscriberServiceManager:
     """
     Manages the Faster-Whisper transcription service with automatic model handling:
     
@@ -27,18 +27,36 @@ class TranscriberManager:
 
     # Required files that must exist in a valid CTranslate2 model directory
     REQUIRED_MODEL_FILES = {"model.bin", "config.json", "tokenizer.json"}
+    
+    # Singleton instance
+    _instance = None
 
-    def __init__(self, config: TranscriberConfiguration) -> None:
+    def __new__(cls, config: Optional[TranscriberConfiguration] = None):
+        if cls._instance is None:
+            if config is None:
+                raise ValueError("Configuration is required for first initialization")
+            cls._instance = super(TranscriberServiceManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, config: Optional[TranscriberConfiguration] = None):
         """
         Initialize the transcription service manager.
         
         Args:
             config: Configuration for the transcriber service from environment
         """
+        # Skip initialization if already done
+        if hasattr(self, '_initialized') and self._initialized:
+            return
+
+        if config is None:
+            raise ValueError("Configuration is required for first initialization")
+
         self.config = config
         
         # Resolve models directory path
-        workspace_root = Path.cwd().resolve()
+        workspace_root = Path(os.getcwd()).resolve()
         etc_directory = workspace_root / "etc"
         self.models_directory = Path(config.models_directory or (etc_directory / "models")).resolve()
         self.model_instance_directory = (self.models_directory / config.model_name).resolve()
@@ -56,6 +74,7 @@ class TranscriberManager:
 
         # Ensure model is available and loaded
         self._initialize_model()
+        self._initialized = True
 
     def _initialize_model(self) -> None:
         """Initialize the model, downloading if necessary."""
@@ -124,48 +143,93 @@ class TranscriberManager:
         if not hasattr(self, "model") or self.model is None:
             raise RuntimeError("Model not initialized")
 
-        logger.info("Starting transcription", extra={"input_file": input_file.name})
-        
-        # Run transcription
-        transcript_segments, transcription_info = self.model.transcribe(
-            str(input_file),
-            vad_filter=use_vad,
-            beam_size=beam_size
-        )
-        
-        logger.info("Transcription completed", 
-                   extra={
-                       "detected_language": transcription_info.language,
-                       "language_confidence": transcription_info.language_probability
-                   })
+        # Convert to Path objects if they're strings
+        input_file = Path(input_file)
+        output_directory = Path(output_directory)
 
-        # Prepare output paths
-        output_directory.mkdir(parents=True, exist_ok=True)
-        text_file_path = output_directory / f"{input_file.stem}.txt"
-        subtitle_file_path = output_directory / f"{input_file.stem}.srt"
+        # Verify input file
+        if not input_file.exists():
+            raise FileNotFoundError(f"Input file not found: {input_file}")
+        if not input_file.is_file():
+            raise ValueError(f"Input path is not a file: {input_file}")
 
-        # Write outputs
-        with text_file_path.open("w", encoding="utf-8") as text_file, \
-             subtitle_file_path.open("w", encoding="utf-8") as subtitle_file:
+        logger.info("Starting transcription", extra={"input_file": str(input_file.absolute())})
+        
+        try:
+            # Run transcription with more detailed logging
+            logger.info("Running Whisper model transcription")
+            segments_generator = self.model.transcribe(
+                str(input_file.absolute()),
+                vad_filter=use_vad,
+                beam_size=beam_size
+            )
             
-            for segment_index, segment in enumerate(transcript_segments, 1):
-                transcript_text = segment.text.strip()
-                
-                # Write plain text
-                text_file.write(transcript_text + "\n")
-                
-                # Write SRT entry
-                subtitle_file.write(f"{segment_index}\n")
-                subtitle_file.write(f"{format_srt_timestamp(segment.start)} --> {format_srt_timestamp(segment.end)}\n")
-                subtitle_file.write(f"{transcript_text}\n\n")
+            # Convert generator to list and check content
+            segments = list(segments_generator[0])  # [0] contains segments, [1] contains info
+            transcription_info = segments_generator[1]
+            
+            if not segments:
+                logger.error("Transcription produced no segments")
+                raise ValueError("Transcription produced no segments. The audio file might be empty or contain no speech.")
 
-        logger.info("Generated output files", 
-                   extra={
-                       "text_file": text_file_path.name,
-                       "subtitle_file": subtitle_file_path.name
-                   })
-        
-        return text_file_path, subtitle_file_path, transcription_info
+            # Prepare output paths
+            output_directory.mkdir(parents=True, exist_ok=True)
+            text_file_path = output_directory / f"{input_file.stem}.txt"
+            subtitle_file_path = output_directory / f"{input_file.stem}.srt"
+
+            # Write outputs with validation
+            valid_segments = []
+            for segment in segments:
+                if segment.text and segment.text.strip():
+                    valid_segments.append(segment)
+
+            if not valid_segments:
+                logger.error("No valid text segments found in transcription")
+                raise ValueError("Transcription produced no valid text segments. The audio might contain no recognizable speech.")
+
+            logger.info(f"Writing transcripts with {len(valid_segments)} valid segments")
+
+            # Write text file
+            with text_file_path.open("w", encoding="utf-8") as text_file:
+                for segment in valid_segments:
+                    text_file.write(segment.text.strip() + "\n")
+
+            # Write SRT file
+            with subtitle_file_path.open("w", encoding="utf-8") as subtitle_file:
+                for idx, segment in enumerate(valid_segments, 1):
+                    subtitle_file.write(f"{idx}\n")
+                    subtitle_file.write(f"{format_srt_timestamp(segment.start)} --> {format_srt_timestamp(segment.end)}\n")
+                    subtitle_file.write(f"{segment.text.strip()}\n\n")
+
+            # Verify files were created successfully
+            if not text_file_path.exists() or text_file_path.stat().st_size == 0:
+                raise RuntimeError("Failed to create text transcript file or file is empty")
+            if not subtitle_file_path.exists() or subtitle_file_path.stat().st_size == 0:
+                raise RuntimeError("Failed to create subtitle file or file is empty")
+
+            logger.info("Transcription completed successfully", 
+                       extra={
+                           "text_file": str(text_file_path),
+                           "subtitle_file": str(subtitle_file_path),
+                           "valid_segments": len(valid_segments),
+                           "total_segments": len(segments)
+                       })
+
+            return text_file_path, subtitle_file_path, transcription_info
+
+        except Exception as e:
+            error_msg = f"Transcription failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            
+            # Clean up any partial output files
+            for file_path in [text_file_path, subtitle_file_path]:
+                try:
+                    if file_path.exists():
+                        file_path.unlink()
+                except Exception as cleanup_error:
+                    logger.error(f"Failed to clean up file {file_path}: {cleanup_error}")
+            
+            raise RuntimeError(error_msg)
 
     def _download_model(self, model_name: str, download_directory: Path) -> None:
         """Download model files to the specified directory."""

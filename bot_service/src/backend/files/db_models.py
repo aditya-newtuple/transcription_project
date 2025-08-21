@@ -47,7 +47,10 @@ class File(Base):
 
     job: Mapped["Job"] = relationship("Job", back_populates="files")
     transcripts: Mapped[List["Transcript"]] = relationship(
-        "Transcript", back_populates="file", cascade="all, delete-orphan"
+        "Transcript", 
+        back_populates="file", 
+        cascade="all, delete-orphan",
+        lazy="joined"  # This will load transcripts automatically with the file
     )
 
     def __repr__(self) -> str:
@@ -103,14 +106,16 @@ class FileModelService:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             return db.query(File).filter(File.id == file_id).first()
 
-    def list_files(self, job_id: Optional[int] = None, status: Optional[FileStatus] = None) -> List[File]:
+    def list_files(self, job_id: Optional[int] = None, status: Optional[FileStatus] = None, page_size: int = 10) -> List[File]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             query = db.query(File)
             if job_id is not None:
                 query = query.filter(File.job_id == job_id)
             if status is not None:
                 query = query.filter(File.status == status)
-            return query.all()
+            
+            # Return latest files first with pagination
+            return query.order_by(File.source_uploaded_at.desc()).limit(page_size).all()
 
     def update_file_status(self, file_id: int, status: FileStatus, error_message: Optional[str] = None) -> Optional[File]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
@@ -130,3 +135,21 @@ class FileModelService:
             db.commit()
             db.refresh(file)
             return file
+
+    def delete_file(self, file_id: int) -> bool:
+        """Delete a file and its associated transcripts.
+        
+        Args:
+            file_id: The ID of the file to delete
+            
+        Returns:
+            bool: True if file was found and deleted, False if file was not found
+        """
+        with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
+            file = db.query(File).filter(File.id == file_id).first()
+            if not file:
+                return False
+                
+            db.delete(file)  # This will cascade delete associated transcripts
+            db.commit()
+            return True

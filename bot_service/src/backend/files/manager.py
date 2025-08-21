@@ -29,8 +29,8 @@ class FileManager:
             return None
         return FileWithTranscriptsResponse.from_orm(file)
 
-    def list_files(self, job_id: Optional[int] = None, status: Optional[FileStatus] = None) -> List[FileResponse]:
-        files = self.file_model_service.list_files(job_id, status)
+    def list_files(self, job_id: Optional[int] = None, status: Optional[FileStatus] = None, page_size: int = 10) -> List[FileResponse]:
+        files = self.file_model_service.list_files(job_id, status, page_size)
         return [FileResponse.from_orm(file) for file in files]
 
     def update_file_status(self, file_id: int, status: FileStatus, error_message: Optional[str] = None) -> Optional[FileResponse]:
@@ -39,3 +39,27 @@ class FileManager:
             return None
         self.job_manager.update_job_counts(file.job_id)
         return FileResponse.from_orm(file)
+
+    def delete_file(self, file_id: int) -> bool:
+        """Delete a file and its associated transcripts.
+        
+        Args:
+            file_id: The ID of the file to delete
+            
+        Returns:
+            bool: True if file was found and deleted, False if file was not found
+        """
+        # Get the file first to get the job_id
+        file = self.file_model_service.get_file(file_id)
+        if not file:
+            return False
+            
+        job_id = file.job_id
+        # Delete the file (and associated transcripts via cascade)
+        success = self.file_model_service.delete_file(file_id)
+        
+        if success:
+            # Update job counts since we deleted a file
+            self.job_manager.update_job_counts(job_id)
+            
+        return success

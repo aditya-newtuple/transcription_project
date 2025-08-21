@@ -36,7 +36,11 @@ class Transcript(Base):
     is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     # Forward ref; no runtime import
-    file: Mapped["File"] = relationship("File", back_populates="transcripts")
+    file: Mapped["File"] = relationship(
+        "File", 
+        back_populates="transcripts",
+        lazy="joined"  # This will load the file automatically with the transcript
+    )
 
     def __repr__(self) -> str:
         return f"<Transcript(id={self.id}, file_id={self.file_id}, version={self.version}, format={self.format})>"
@@ -74,14 +78,16 @@ class TranscriptModelService:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             return db.query(Transcript).filter(Transcript.id == transcript_id).first()
 
-    def list_transcripts(self, file_id: Optional[int] = None, is_approved: Optional[bool] = None) -> List[Transcript]:
+    def list_transcripts(self, file_id: Optional[int] = None, is_approved: Optional[bool] = None, page_size: int = 10) -> List[Transcript]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             query = db.query(Transcript)
             if file_id is not None:
                 query = query.filter(Transcript.file_id == file_id)
             if is_approved is not None:
                 query = query.filter(Transcript.is_approved == is_approved)
-            return query.all()
+            
+            # Return latest transcripts first with pagination
+            return query.order_by(Transcript.created_at.desc()).limit(page_size).all()
 
     def approve_transcript(self, transcript_id: int, approved_by: int) -> Optional[Transcript]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
