@@ -51,9 +51,11 @@ class JobModelService:
         self.database_manager = database_service_manager
         self.current_db = self.database_manager.postgres_db_service()
         self.current_db_engine = self.current_db.engine
+        logger.info(f"Connected to {self.current_db_engine.url.render_as_string(hide_password=False)}")
 
     def create_job(self, request: CreateJobRequest, created_by: int) -> Job:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
+            logger.info(f"Creating job for user {created_by}")
             job = Job(
                 created_by=created_by,
                 status=BatchStatus.CREATED,

@@ -14,7 +14,16 @@ from jobs.manager import JobManager
 from transcriber.manager import TranscriberServiceManager
 from transcripts.db_models import TranscriptModelService
 from common.models import BatchStatus, JobStatus
+from argparse import ArgumentParser
 
+from dotenv import load_dotenv
+
+
+
+parser = ArgumentParser(description="Runs the BOT service")
+parser.add_argument("-e", "--env", help="Path to .env file", default="./etc/.env")
+args = parser.parse_args()
+load_dotenv(args.env)
 
 def main():
     """Main worker function"""
@@ -22,7 +31,7 @@ def main():
         # Initialize services
         config = Configuration()
         database_manager = DatabaseServiceManager(config)
-        redis_manager = RedisManager(config)
+        redis_manager = database_manager.redis_db_service()
         
         # Initialize all required services
         job_model_service = JobModelService(database_manager)

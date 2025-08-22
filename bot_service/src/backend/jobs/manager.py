@@ -18,6 +18,7 @@ from transcripts.models.request import CreateTranscriptRequest
 from common.redis import RedisManager
 from common.logger import logger
 from sqlalchemy.orm import joinedload
+from database.manager import DatabaseServiceManager, RedisDBService
 
 
 # Constants for file upload limitations
@@ -33,7 +34,7 @@ class JobManager:
         file_model_service: FileModelService,
         transcriber_service: TranscriberServiceManager,
         transcript_model_service: TranscriptModelService,
-        redis_manager: RedisManager
+        redis_manager: RedisDBService
     ) -> None:
         self.job_model_service = job_model_service
         self.file_model_service = file_model_service

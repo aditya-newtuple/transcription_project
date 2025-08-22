@@ -89,18 +89,12 @@ file_model_service = FileModelService(database_service_manager)
 transcript_model_service = TranscriptModelService(database_service_manager)
 
 # Initialize Redis manager
-redis_manager = RedisManager(config)
+# redis_manager = RedisManager(config)
 
 # Jobs service
 job_model_service = JobModelService(database_service_manager)
-job_manager = JobManager(job_model_service, file_model_service, transcriber_service_manager, transcript_model_service, redis_manager)
-jobs_rest_controller = JobsRestController(
-    job_manager,
-    file_model_service,
-    transcriber_service_manager,
-    transcript_model_service,
-    redis_manager
-)
+job_manager = JobManager(job_model_service, file_model_service, transcriber_service_manager, transcript_model_service, database_service_manager.redis_db_service())
+jobs_rest_controller = JobsRestController(job_manager)
 jobs_rest_controller.prepare(app_router)
 
 # Files service

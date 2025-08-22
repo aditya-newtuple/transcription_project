@@ -16,18 +16,8 @@ class JobsRestController:
     def __init__(
         self, 
         job_manager: JobManager,
-        file_model_service: FileModelService,
-        transcriber_service: TranscriberServiceManager,
-        transcript_model_service: TranscriptModelService,
-        redis_manager: RedisManager
     ):
-        self.job_manager = JobManager(
-            job_manager.job_model_service,
-            file_model_service,
-            transcriber_service,
-            transcript_model_service,
-            redis_manager
-        )
+        self.job_manager = job_manager
 
     def prepare(self, app: APIRouter) -> None:
         @app.post("/jobs", tags=["jobs"], response_model=JobResponse)
