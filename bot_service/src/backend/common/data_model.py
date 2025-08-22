@@ -138,6 +138,16 @@ class OpenSearchConfiguration(BaseModel):
     index_name: str
 
 
+class RedisConfiguration(BaseModel):
+    """Represents the Redis configuration"""
+
+    host: str
+    port: int
+    db: int
+    password: Optional[str] = None
+    queue_name: str = "transcription_jobs"
+
+
 class LangfuseConfiguration(BaseModel):
     """Represents the Langfuse configuration"""
 
@@ -196,6 +206,15 @@ class ObservabilityConfiguration(BaseModel):
     otel_grpc_agent_port: int
 
 
+class TranscriberConfiguration(BaseModel):
+    """Represents the Transcriber service configuration"""
+
+    model_name: str
+    device: str
+    compute_type: str
+    models_directory: Optional[str]
+
+
 class Configuration(BaseModel):
     """Represents the configuration"""
 
@@ -215,6 +234,9 @@ class Configuration(BaseModel):
     sqlserver_configuration: SQLServerConfiguration
     sqlite_configuration: SQLiteConfiguration
     opensearch_configuration: OpenSearchConfiguration
+    redis_configuration: RedisConfiguration
+    
+    transcriber_configuration: TranscriberConfiguration
 
     pinecone_configuration: PineconeConfiguation
 
@@ -308,5 +330,24 @@ class VectorDBModel(ExtendedStrEnum):
     pinecone = "pinecone"
     azure_ai_search = "azure_ai_search"
 
+
+class JobStatus(str, Enum):
+    CREATED = 'created'
+    QUEUED = 'queued'
+    RUNNING = 'running'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+    CANCELED = 'canceled'
+
+class FileStatus(str, Enum):
+    QUEUED = 'queued'
+    RUNNING = 'running'
+    SUCCEEDED = 'succeeded'
+    FAILED = 'failed'
+    CANCELED = 'canceled'
+
+class TranscriptFormat(str, Enum):
+    TXT = 'txt'
+    SRT = 'srt'
 
 # endregion

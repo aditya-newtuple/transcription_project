@@ -6,9 +6,12 @@ services:
       context: ./bot_service
       dockerfile: ./dockerfiles/api.Dockerfile
     env_file:
-        - ./bot_service/src/backend/etc/.env
-    # volumes:
-      # - ./common:/app/common
+      - ./bot_service/src/backend/etc/.env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SQLALCHEMY_DATABASE_MIGRATION_URL=${SQLALCHEMY_DATABASE_MIGRATION_URL:-postgresql://root:root@pg-database:5432/transcriber_local_db}
+    volumes:
+      - ./bot_service/src/backend/etc:/app/backend/etc
     healthcheck:
       test: curl --fail http://localhost:8081/v1/api/health || exit 1
       interval: 40s
@@ -20,9 +23,35 @@ services:
     networks:
       - shared_network
       - llm-network
-    dns:
-      - 8.8.8.8
-    restart: "unless-stopped"
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      pg-database:
+        condition: service_healthy
+
+  bot-worker-service:
+    image: bot-api-service:dev
+    container_name: bot-worker-service-dev
+    working_dir: /app/backend
+    command: ["python", "-m", "worker"]  # or "python", "worker.py"
+    env_file:
+      - ./bot_service/src/backend/etc/.env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - RQ_WORKER_QUEUES=transcribe
+      - SQLALCHEMY_DATABASE_MIGRATION_URL=${SQLALCHEMY_DATABASE_MIGRATION_URL:-postgresql://root:root@pg-database:5432/transcriber_local_db}
+    volumes:
+      - ./bot_service/src/backend/etc:/app/backend/etc
+    networks:
+      - shared_network
+      - llm-network
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      pg-database:
+        condition: service_healthy
 
   bot-ui-service:
     image: bot-ui-service:dev

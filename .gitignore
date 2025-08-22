@@ -166,3 +166,8 @@ cython_debug/
 values.yaml
 /.terraform
 node_modules
+
+# Ignore specific etc directories
+bot_service/src/backend/etc/input/
+bot_service/src/backend/etc/output/
+bot_service/src/backend/etc/models/

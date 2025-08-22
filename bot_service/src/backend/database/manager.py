@@ -1,5 +1,6 @@
 from contextlib import contextmanager
-from typing import Any, Dict, List
+import json
+from typing import Any, Dict, List, Generator, Optional
 
 from common.configuration import Configuration
 from common.data_model import (  # SQLServerConfiguration,
@@ -7,6 +8,7 @@ from common.data_model import (  # SQLServerConfiguration,
     SQLiteConfiguration,
 )
 from common.logger import logger
+import redis
 from exceptions.db import DBException
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from sqlalchemy import MetaData, create_engine
@@ -20,8 +22,11 @@ from sqlalchemy.exc import (
     SQLAlchemyError,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker, Session
 from sqlalchemy.schema import CreateTable
+
+# Create Base class for SQLAlchemy models
+Base = declarative_base()
 
 
 class OpenSearchDBService:
@@ -251,23 +256,28 @@ class PostgresDBService:
     @contextmanager
     def get_custom_db_contxt_session(self, engine: Engine):
         """Creates a context with an open SQLAlchemy session."""
+        connection = None
+        db_session = None
         try:
             connection = engine.connect()
             db_session = scoped_session(sessionmaker(autocommit=False, autoflush=True, bind=engine, expire_on_commit=False))
             yield db_session
         except (OperationalError, SQLAlchemyError, ProgrammingError, NoSuchTableError, CompileError, DatabaseError, DBException) as e:
-            db_session.rollback()
+            if db_session:
+                db_session.rollback()
             raise DBException(f"Unable to perform PostgreSQL db operation due to error {e}, rolling back")
         finally:
             errors = []
-            try:
-                db_session.close()
-            except Exception as e:
-                errors.append(e)
-            try:
-                connection.close()
-            except Exception as e:
-                errors.append(e)
+            if db_session:
+                try:
+                    db_session.close()
+                except Exception as e:
+                    errors.append(e)
+            if connection:
+                try:
+                    connection.close()
+                except Exception as e:
+                    errors.append(e)
             if errors:
                 logger.error(f"Failed to close connection and session due to {errors}")
                 raise SQLAlchemyError(f"Failed to close connection and session due to {errors}")
@@ -482,6 +492,67 @@ class SQLiteDBService:
             logger.error(f"Could not get table names due to {e}")
             return []
 
+class RedisDBService:
+    """Redis connection manager"""
+
+    def __init__(self, config: Configuration):
+        """Initialize Redis connection"""
+        self.config = config.configuration()
+        self.redis_config = self.config.redis_configuration
+        self.redis_client = redis.Redis(
+            host=self.redis_config.host,
+            port=self.redis_config.port,
+            db=self.redis_config.db,
+            # password=self.redis_config.password,
+            decode_responses=True
+        )
+        self.queue_name = self.redis_config.queue_name
+        
+        # Disable persistence to avoid disk write issues
+        try:
+            self.redis_client.config_set('save', '')
+            self.redis_client.config_set('appendonly', 'no')
+            logger.info("Redis persistence disabled")
+        except Exception as e:
+            logger.warning(f"Could not disable Redis persistence: {str(e)}")
+
+    def enqueue_job(self, job_data: dict[str, Any]) -> str:
+        """
+        Add a job to the Redis queue
+        Returns the job ID
+        """
+        try:
+            job_id = job_data.get("job_id")
+            self.redis_client.rpush(self.queue_name, json.dumps(job_data))
+            logger.info(f"Enqueued job {job_id} to Redis queue")
+            return job_id
+        except Exception as e:
+            logger.error(f"Failed to enqueue job to Redis: {str(e)}")
+            raise
+
+    def dequeue_job(self) -> Optional[dict[str, Any]]:
+        """
+        Get the next job from the Redis queue
+        Returns None if queue is empty
+        """
+        try:
+            # BLPOP blocks until a job is available
+            result = self.redis_client.blpop(self.queue_name, timeout=1)
+            if result:
+                _, job_json = result
+                job_data = json.loads(job_json)
+                logger.info(f"Dequeued job {job_data.get('job_id')} from Redis queue")
+                return job_data
+            return None
+        except Exception as e:
+            logger.error(f"Failed to dequeue job from Redis: {str(e)}")
+            raise
+
+    def get_queue_length(self) -> int:
+        """Get number of jobs in queue"""
+        return self.redis_client.llen(self.queue_name)
+
+
 
 class DatabaseServiceManager:
     """
@@ -491,6 +562,8 @@ class DatabaseServiceManager:
     def __init__(self, config: Configuration):
         self._postgres_db_service = PostgresDBService(config)
         self._opensearch_db_service = OpenSearchDBService(config)
+        # self._redis_service = RedisManager(config)
+        self._redis_service = RedisDBService(config)
         # self._sqlserver_db_service = SQLServerDBService(config)
         self._sqlite_db_service = SQLiteDBService(config)
 
@@ -501,6 +574,10 @@ class DatabaseServiceManager:
     def opensearch_db_service(self) -> OpenSearchDBService:
         """Get the OpenSearch database service."""
         return self._opensearch_db_service
+
+    def redis_db_service(self) -> RedisDBService:
+        """Get the Redis service."""
+        return self._redis_service
 
     # def sqlserver_db_service(self) -> SQLServerDBService:
     #     return self._sqlserver_db_service
