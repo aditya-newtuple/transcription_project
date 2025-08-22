@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class JobStatus(str, Enum):
+class BatchStatus(str, Enum):
     CREATED = 'created'
     QUEUED = 'queued'
     RUNNING = 'running'
@@ -10,7 +10,7 @@ class JobStatus(str, Enum):
     CANCELED = 'canceled'
 
 
-class FileStatus(str, Enum):
+class JobStatus(str, Enum):
     QUEUED = 'queued'
     RUNNING = 'running'
     SUCCEEDED = 'succeeded'

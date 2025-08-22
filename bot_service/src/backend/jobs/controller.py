@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 
-from common.models import JobStatus
+from common.models import BatchStatus
 from jobs.manager import JobManager
 from jobs.models.response import JobResponse, JobWithFilesResponse
 from files.db_models import FileModelService
@@ -33,8 +33,6 @@ class JobsRestController:
         @app.post("/jobs", tags=["jobs"], response_model=JobResponse)
         async def create_job(
             files: List[UploadFile] = File(...),
-            title: Optional[str] = Form(None),
-            notes: Optional[str] = Form(None),
             # TODO: Get actual user ID from auth
             current_user_id: int = 1
         ):
@@ -43,8 +41,6 @@ class JobsRestController:
             """
             return await self.job_manager.create_job_with_files(
                 files=files,
-                title=title,
-                notes=notes,
                 created_by=current_user_id
             )
 
@@ -61,7 +57,7 @@ class JobsRestController:
         @app.get("/jobs", tags=["jobs"], response_model=List[JobResponse])
         def list_jobs(
             created_by: Optional[int] = None,
-            status: Optional[JobStatus] = None,
+            status: Optional[BatchStatus] = None,
             page_size: int = Query(default=10, ge=1, le=50, description="Number of jobs to return"),
         ):
             """
@@ -77,7 +73,7 @@ class JobsRestController:
         @app.put("/jobs/{job_id}/status", tags=["jobs"], response_model=JobResponse)
         def update_job_status(
             job_id: int,
-            status: JobStatus,
+            status: BatchStatus,
         ):
             """
             Update a job's status.

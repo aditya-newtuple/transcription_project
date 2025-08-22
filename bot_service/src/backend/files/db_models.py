@@ -4,12 +4,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import text
 
 from common.logger import logger
-from common.models import FileStatus
+from common.models import JobStatus
 from database.manager import Base, DatabaseServiceManager
 from files.models.request import CreateFileRequest
 
@@ -24,16 +24,14 @@ class File(Base):
     job_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False)
     created_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
-    sequence_no: Mapped[Optional[int]] = mapped_column(Integer)
     source_name: Mapped[Optional[str]] = mapped_column(String)
-    source_path: Mapped[Optional[str]] = mapped_column(String)
-    source_mime: Mapped[Optional[str]] = mapped_column(String)
-    source_bytes: Mapped[Optional[int]] = mapped_column(BigInteger)
-    source_uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=text("now()"))
-    source_deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    path: Mapped[Optional[str]] = mapped_column(String)
+    mime_type: Mapped[Optional[str]] = mapped_column(String)
+    bytes: Mapped[Optional[int]] = mapped_column(BigInteger)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
-    status: Mapped[FileStatus] = mapped_column(
-        Enum(FileStatus, name="job_status", values_callable=lambda e: [m.value for m in e]),
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(JobStatus, name="job_status", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         server_default="queued",
     )
@@ -41,9 +39,7 @@ class File(Base):
     queued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=text("now()"))
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    error_message: Mapped[Optional[str]] = mapped_column(Text)
-    language_hint: Mapped[Optional[str]] = mapped_column(String)
-    duration_sec: Mapped[Optional[int]] = mapped_column(Integer)
+    message: Mapped[Optional[str]] = mapped_column(Text)
 
     job: Mapped["Job"] = relationship("Job", back_populates="files")
     transcripts: Mapped[List["Transcript"]] = relationship(
@@ -56,7 +52,7 @@ class File(Base):
     def __repr__(self) -> str:
         return f"<File(id={self.id}, job_id={self.job_id}, status={self.status})>"
 
-        
+
 class FileModelService:
     def __init__(self, database_service_manager: DatabaseServiceManager) -> None:
         super().__init__()
@@ -64,39 +60,28 @@ class FileModelService:
         self.current_db = self.database_manager.postgres_db_service()
         self.current_db_engine = self.current_db.engine
 
-        # ⚠️ Recommended: let Alembic manage schema; comment out in prod
-        # try:
-        #     if Base:
-        #         logger.info("Creating base tables for files..")
-        #         Base.metadata.create_all(bind=self.current_db_engine)
-        # except Exception as e:
-        #     logger.error(f"Could not create base tables for files due to {e}")
-
     def create_file(self, request: CreateFileRequest, created_by: int) -> File:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             file = File(
                 job_id=request.job_id,
                 created_by=created_by,
-                sequence_no=request.sequence_no,
-                language_hint=request.language_hint,
-                status=FileStatus.QUEUED,
+                status=JobStatus.QUEUED,
             )
             db.add(file)
             db.commit()
             db.refresh(file)
             return file
 
-    def update_file_paths(self, file_id: int, source_path: str, source_name: str, source_mime: str, source_bytes: int) -> Optional[File]:
+    def update_file_paths(self, file_id: int, path: str, source_name: str, mime_type: str, bytes: int) -> Optional[File]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             file = db.query(File).filter(File.id == file_id).first()
             if not file:
                 return None
 
-            file.source_path = source_path
+            file.path = path
             file.source_name = source_name
-            file.source_mime = source_mime
-            file.source_bytes = source_bytes
-            file.source_uploaded_at = datetime.utcnow()
+            file.mime_type = mime_type
+            file.bytes = bytes
 
             db.commit()
             db.refresh(file)
@@ -106,7 +91,7 @@ class FileModelService:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             return db.query(File).filter(File.id == file_id).first()
 
-    def list_files(self, job_id: Optional[int] = None, status: Optional[FileStatus] = None, page_size: int = 10) -> List[File]:
+    def list_files(self, job_id: Optional[int] = None, status: Optional[JobStatus] = None, page_size: int = 10) -> List[File]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             query = db.query(File)
             if job_id is not None:
@@ -115,21 +100,21 @@ class FileModelService:
                 query = query.filter(File.status == status)
             
             # Return latest files first with pagination
-            return query.order_by(File.source_uploaded_at.desc()).limit(page_size).all()
+            return query.order_by(File.queued_at.desc()).limit(page_size).all()
 
-    def update_file_status(self, file_id: int, status: FileStatus, error_message: Optional[str] = None) -> Optional[File]:
+    def update_file_status(self, file_id: int, status: JobStatus, message: Optional[str] = None) -> Optional[File]:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
             file = db.query(File).filter(File.id == file_id).first()
             if not file:
                 return None
 
             file.status = status
-            if error_message is not None:
-                file.error_message = error_message
+            if message is not None:
+                file.message = message
 
-            if status == FileStatus.RUNNING and not file.started_at:
+            if status == JobStatus.RUNNING and not file.started_at:
                 file.started_at = datetime.utcnow()
-            elif status in (FileStatus.SUCCEEDED, FileStatus.FAILED, FileStatus.CANCELED):
+            elif status in (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELED):
                 file.finished_at = datetime.utcnow()
 
             db.commit()

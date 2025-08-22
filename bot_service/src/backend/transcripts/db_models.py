@@ -45,20 +45,13 @@ class Transcript(Base):
     def __repr__(self) -> str:
         return f"<Transcript(id={self.id}, file_id={self.file_id}, version={self.version}, format={self.format})>"
 
+
 class TranscriptModelService:
     def __init__(self, database_service_manager: DatabaseServiceManager) -> None:
         super().__init__()
         self.database_manager = database_service_manager
         self.current_db = self.database_manager.postgres_db_service()
         self.current_db_engine = self.current_db.engine
-
-        # ⚠️ Recommended: let Alembic manage schema; comment out in prod
-        # try:
-        #     if Base:
-        #         logger.info("Creating base tables for transcripts..")
-        #         Base.metadata.create_all(bind=self.current_db_engine)
-        # except Exception as e:
-        #     logger.error(f"Could not create base tables for transcripts due to {e}")
 
     def create_transcript(self, request: CreateTranscriptRequest, created_by: int) -> Transcript:
         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:

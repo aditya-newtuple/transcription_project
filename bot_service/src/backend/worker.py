@@ -13,7 +13,7 @@ from jobs.db_models import JobModelService
 from jobs.manager import JobManager
 from transcriber.manager import TranscriberServiceManager
 from transcripts.db_models import TranscriptModelService
-from common.models import JobStatus, FileStatus
+from common.models import BatchStatus, JobStatus
 
 
 def main():
@@ -62,7 +62,7 @@ def main():
                     if file:
                         current_job_id = file.job_id
                         # Update job status to running
-                        job_manager.update_job_status(current_job_id, JobStatus.RUNNING)
+                        job_manager.update_job_status(current_job_id, BatchStatus.RUNNING)
                     
                     # Process the file
                     job_manager.process_queued_file(
@@ -75,8 +75,8 @@ def main():
                     if current_job_id:
                         job = job_manager.update_job_counts(current_job_id)
                         # Check if all files are processed
-                        if job and job.total_count == job.succeeded_count:
-                            job_manager.update_job_status(current_job_id, JobStatus.COMPLETED)
+                        if job and job.status == BatchStatus.COMPLETED:
+                            job_manager.update_job_status(current_job_id, BatchStatus.COMPLETED)
                     
                     logger.info(f"Completed processing file {file_id}")
                     
@@ -92,17 +92,17 @@ def main():
                     try:
                         file_model_service.update_file_status(
                             current_file_id, 
-                            FileStatus.FAILED,
-                            error_message=str(e)
+                            JobStatus.FAILED,
+                            message=str(e)
                         )
                     except Exception as status_error:
                         logger.error(f"Failed to update file status: {str(status_error)}")
                 
                 if current_job_id:
                     try:
-                        job = job_model_service.get_job(current_job_id)
-                        if job and job.total_count == job.failed_count:
-                            job_manager.update_job_status(current_job_id, JobStatus.FAILED)
+                        job = job_manager.update_job_counts(current_job_id)
+                        if job and job.status == BatchStatus.FAILED:
+                            job_manager.update_job_status(current_job_id, BatchStatus.FAILED)
                     except Exception as status_error:
                         logger.error(f"Failed to update job status: {str(status_error)}")
                 

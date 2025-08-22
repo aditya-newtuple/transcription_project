@@ -1,8 +1,8 @@
-"""initial schema
+"""Initial schema
 
-Revision ID: 001_initial_schema
+Revision ID: 001_initial
 Revises: 
-Create Date: 2024-02-20 08:00:00.000000
+Create Date: 2024-03-19 12:00:00.000000
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '001_initial_schema'
+revision = '001_initial'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -44,20 +44,13 @@ def upgrade() -> None:
             nullable=False,
             server_default="created",
         ),
-        sa.Column("title", sa.String()),
-        sa.Column("notes", sa.Text()),
         sa.Column("total_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("queued_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("running_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("succeeded_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("failed_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("skipped_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
             "created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
         ),
         sa.Column("started_at", sa.DateTime()),
         sa.Column("finished_at", sa.DateTime()),
-        sa.Column("error_summary", sa.Text()),
+        sa.Column("message", sa.Text()),
     )
 
     op.create_table(
@@ -65,18 +58,11 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column("job_id", sa.BigInteger(), nullable=False),
         sa.Column("created_by", sa.BigInteger(), nullable=False),
-        sa.Column("sequence_no", sa.Integer()),
         sa.Column("source_name", sa.String()),
-        sa.Column("source_path", sa.String()),
-        sa.Column("source_mime", sa.String()),
-        sa.Column("source_bytes", sa.BigInteger()),
-        sa.Column(
-            "source_uploaded_at",
-            sa.DateTime(),
-            nullable=False,
-            server_default=sa.text("now()"),
-        ),
-        sa.Column("source_deleted_at", sa.DateTime()),
+        sa.Column("path", sa.String()),
+        sa.Column("mime_type", sa.String()),
+        sa.Column("bytes", sa.BigInteger()),
+        sa.Column("deleted_at", sa.DateTime()),
         sa.Column(
             "status",
             postgresql.ENUM(
@@ -94,9 +80,7 @@ def upgrade() -> None:
         sa.Column("queued_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
         sa.Column("started_at", sa.DateTime()),
         sa.Column("finished_at", sa.DateTime()),
-        sa.Column("error_message", sa.Text()),
-        sa.Column("language_hint", sa.String()),
-        sa.Column("duration_sec", sa.Integer()),
+        sa.Column("message", sa.Text()),
         sa.ForeignKeyConstraint(["job_id"], ["jobs.id"], ondelete="CASCADE"),
     )
 
@@ -134,7 +118,6 @@ def upgrade() -> None:
     op.create_index("idx_jobs_created_at", "jobs", ["created_at"])
 
     op.create_index("idx_file_job_id", "file", ["job_id"])
-    op.create_index("idx_file_job_sequence", "file", ["job_id", "sequence_no"])
     op.create_index("idx_file_status", "file", ["status"])
     op.create_index("idx_file_created_by", "file", ["created_by"])
 
@@ -148,7 +131,6 @@ def downgrade() -> None:
     op.drop_index("idx_transcripts_file_approved", table_name="transcripts")
     op.drop_index("idx_file_created_by", table_name="file")
     op.drop_index("idx_file_status", table_name="file")
-    op.drop_index("idx_file_job_sequence", table_name="file")
     op.drop_index("idx_file_job_id", table_name="file")
     op.drop_index("idx_jobs_created_at", table_name="jobs")
     op.drop_index("idx_jobs_status", table_name="jobs")
@@ -163,4 +145,4 @@ def downgrade() -> None:
     conn = op.get_bind()
     conn.execute(sa.text("DROP TYPE IF EXISTS job_status CASCADE"))
     conn.execute(sa.text("DROP TYPE IF EXISTS transcript_format CASCADE"))
-    conn.execute(sa.text("DROP TYPE IF EXISTS batch_status CASCADE"))
+    conn.execute(sa.text("DROP TYPE IF EXISTS batch_status CASCADE")) 

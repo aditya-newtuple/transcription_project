@@ -6,17 +6,18 @@ import uuid
 import logging
 
 from fastapi import HTTPException, UploadFile
-from common.models import JobStatus, FileStatus, TranscriptFormat
-from jobs.db_models import JobModelService
+from common.models import BatchStatus, JobStatus, TranscriptFormat
+from jobs.db_models import JobModelService, Job
 from jobs.models.request import CreateJobRequest, FileUploadInfo
 from jobs.models.response import JobResponse, JobWithFilesResponse
-from files.db_models import FileModelService
+from files.db_models import FileModelService, File  # Added File import
 from files.models.request import CreateFileRequest
 from transcriber.manager import TranscriberServiceManager
 from transcripts.db_models import TranscriptModelService
 from transcripts.models.request import CreateTranscriptRequest
 from common.redis import RedisManager
 from common.logger import logger
+from sqlalchemy.orm import joinedload
 
 
 # Constants for file upload limitations
@@ -94,7 +95,7 @@ class JobManager:
         file_infos = []
         
         # Process each uploaded file
-        for idx, file in enumerate(files):
+        for file in files:
             try:
                 # Read file content and check size
                 content = await file.read()
@@ -126,7 +127,6 @@ class JobManager:
                     source_path=str(file_path.absolute()),  # Store absolute path
                     source_mime=file.content_type,
                     source_bytes=file_size,
-                    sequence_no=idx + 1  # 1-based sequence numbers
                 )
                 file_infos.append(file_info)
                 
@@ -157,8 +157,6 @@ class JobManager:
     async def create_job_with_files(
         self,
         files: List[UploadFile],
-        title: Optional[str],
-        notes: Optional[str],
         created_by: int
     ) -> JobResponse:
         """
@@ -170,8 +168,6 @@ class JobManager:
 
             # Create the job request
             job_request = CreateJobRequest(
-                title=title,
-                notes=notes,
                 files=file_infos
             )
 
@@ -197,28 +193,23 @@ class JobManager:
             # Create file record
             file_request = CreateFileRequest(
                 job_id=job.id,
-                sequence_no=file_info.sequence_no,
-                language_hint=file_info.language_hint
             )
             file = self.file_model_service.create_file(file_request, created_by)
             
             # Update file paths with absolute path
             file = self.file_model_service.update_file_paths(
                 file_id=file.id,
-                source_path=str(self._get_absolute_path(file_info.source_path)),
+                path=str(self._get_absolute_path(file_info.source_path)),
                 source_name=file_info.source_name,
-                source_mime=file_info.source_mime,
-                source_bytes=file_info.source_bytes
+                mime_type=file_info.source_mime,
+                bytes=file_info.source_bytes
             )
 
             # Queue the file for transcription
             self.queue_file_for_transcription(file.id, created_by, file_info.source_path)
 
         # Update job status to QUEUED since files are queued for processing
-        self.job_model_service.update_job_status(job.id, JobStatus.QUEUED)
-        
-        # Update job counts and return
-        updated_job = self.job_model_service.update_job_counts(job.id)
+        updated_job = self.job_model_service.update_job_status(job.id, BatchStatus.QUEUED)
         return JobResponse.from_orm(updated_job)
 
     def queue_file_for_transcription(self, file_id: int, created_by: int, source_path: str) -> None:
@@ -244,8 +235,8 @@ class JobManager:
             # If queueing fails, mark the file as failed
             self.file_model_service.update_file_status(
                 file_id, 
-                FileStatus.FAILED,
-                error_message=f"Failed to queue for transcription: {str(e)}"
+                JobStatus.FAILED,
+                message=f"Failed to queue for transcription: {str(e)}"
             )
             raise
 
@@ -262,7 +253,7 @@ class JobManager:
             logger.info(f"Processing file: {input_file}")
 
             # Update file status to RUNNING
-            self.file_model_service.update_file_status(file_id, FileStatus.RUNNING)
+            self.file_model_service.update_file_status(file_id, JobStatus.RUNNING)
             
             try:
                 # Perform transcription
@@ -319,7 +310,7 @@ class JobManager:
                     raise RuntimeError(f"Failed to save transcripts: {str(transcript_error)}")
 
                 # Update file status to SUCCEEDED
-                self.file_model_service.update_file_status(file_id, FileStatus.SUCCEEDED)
+                self.file_model_service.update_file_status(file_id, JobStatus.SUCCEEDED)
                 
                 logger.info(f"Successfully processed file {file_id}")
                 
@@ -327,8 +318,8 @@ class JobManager:
                 logger.error(f"Failed to process file {file_id}: {str(process_error)}")
                 self.file_model_service.update_file_status(
                     file_id, 
-                    FileStatus.FAILED,
-                    error_message=str(process_error)
+                    JobStatus.FAILED,
+                    message=str(process_error)
                 )
                 raise
             
@@ -339,29 +330,32 @@ class JobManager:
             # Update file status to FAILED with error message
             self.file_model_service.update_file_status(
                 file_id, 
-                FileStatus.FAILED,
-                error_message=str(e)
+                JobStatus.FAILED,
+                message=str(e)
             )
             raise RuntimeError(error_msg)
 
     def get_job(self, job_id: int) -> Optional[JobWithFilesResponse]:
+        """Get a job by ID with its files."""
         job = self.job_model_service.get_job(job_id)
         if not job:
             return None
         return JobWithFilesResponse.from_orm(job)
 
-    def list_jobs(self, created_by: Optional[int] = None, status: Optional[JobStatus] = None, page_size: int = 10) -> List[JobResponse]:
+    def list_jobs(self, created_by: Optional[int] = None, status: Optional[BatchStatus] = None, page_size: int = 10) -> List[JobResponse]:
         jobs = self.job_model_service.list_jobs(created_by, status, page_size)
         return [JobResponse.from_orm(job) for job in jobs]
 
-    def update_job_status(self, job_id: int, status: JobStatus) -> Optional[JobResponse]:
+    def update_job_status(self, job_id: int, status: BatchStatus) -> Optional[JobResponse]:
         job = self.job_model_service.update_job_status(job_id, status)
         if not job:
             return None
         return JobResponse.from_orm(job)
 
     def update_job_counts(self, job_id: int) -> Optional[JobResponse]:
+        """Update job status based on its files' statuses."""
         job = self.job_model_service.update_job_counts(job_id)
         if not job:
             return None
         return JobResponse.from_orm(job)
+
