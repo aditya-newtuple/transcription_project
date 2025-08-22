@@ -176,7 +176,7 @@ const Admin: React.FC = () => {
                 <th className="text-left py-3 px-6 text-sm font-medium text-gray-900">User</th>
                 <th className="text-left py-3 px-6 text-sm font-medium text-gray-900">Role</th>
                 <th className="text-left py-3 px-6 text-sm font-medium text-gray-900">Member Since</th>
-                <th className="text-right py-3 px-6 text-sm font-medium text-gray-900">Actions</th>
+                <th className="text-center py-3 px-6 text-sm font-medium text-gray-900">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -215,10 +215,10 @@ const Admin: React.FC = () => {
                     {formatDate(user.createdAt)}
                   </td>
                   <td className="py-4 px-6">
-                    <div className="flex items-center justify-end space-x-2">
+                    <div className="flex items-center justify-between w-full max-w-xs">
                       <button
                         onClick={() => handleRoleToggle(user)}
-                        className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                        className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
                           user.role === 'admin'
                             ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
                             : 'bg-green-100 text-green-800 hover:bg-green-200'
@@ -228,9 +228,9 @@ const Admin: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setShowDeleteModal(user)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="px-4 py-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       >
-                        <UserMinus className="w-4 h-4" />
+                        <UserMinus className="w-4 h-4 text-red-600" />
                       </button>
                     </div>
                   </td>

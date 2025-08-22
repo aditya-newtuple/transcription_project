@@ -151,7 +151,7 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
-            to="/transcripts"
+            to="/transcripts?upload=true"
             className="group relative p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-all duration-200 hover:shadow-md"
           >
             <div className="flex items-center space-x-4">
@@ -230,7 +230,7 @@ const Dashboard: React.FC = () => {
                 Upload your first audio or video file to get started
               </p>
               <Link
-                to="/transcripts"
+                to="/transcripts?upload=true"
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Upload className="w-4 h-4 mr-2" />

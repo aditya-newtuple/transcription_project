@@ -15,16 +15,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload, onCancel }) => {
 
   const acceptedTypes = {
     'audio/mp3': '.mp3',
-    'audio/wav': '.mpeg',
-    'audio/m4a': '.mpeg4',
+    'audio/mpeg': '.mpeg',
+    'audio/mp4': '.mp4',
     'video/mp4': '.mp4',
+    'video/mpeg': '.mpeg',
+    'video/x-m4v': '.mpeg4',
   };
+
+  // Create unique extensions for display
+  const uniqueExtensions = [...new Set(Object.values(acceptedTypes))];
 
   const maxSize = 100 * 1024 * 1024; // 100MB
 
   const validateFile = (file: File): string | null => {
     if (!Object.keys(acceptedTypes).includes(file.type)) {
-      return 'File type not supported. Please upload MP3, WAV, M4A, MP4, WebM, or MOV files.';
+      return 'File type not supported. Please upload MP3, MPEG, MP4, or MPEG4 files.';
     }
     if (file.size > maxSize) {
       return 'File size too large. Please upload files smaller than 100MB.';
@@ -120,7 +125,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload, onCancel }) => {
                 Support for mp4, mpeg, mp3,mpeg4
               </p>
               <div className="flex flex-wrap justify-center gap-2 text-xs text-gray-400">
-                {Object.values(acceptedTypes).map((ext, index) => (
+                {uniqueExtensions.map((ext, index) => (
                   <span key={index} className="px-2 py-1 bg-gray-100 rounded">
                     {ext.toUpperCase()}
                   </span>
@@ -159,7 +164,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload, onCancel }) => {
                 <h4 className="font-medium text-blue-900 mb-2">What happens next?</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
                   <li>• Your file will be processed using advanced AI</li>
-                  <li>• Processing time depends on file length (typically 1-5 minutes)</li>
+                  <li>• Processing time depends on file length.</li>
                   <li>• You'll receive an SRT subtitle file for download</li>
                   <li>• The transcript will be available for viewing and editing</li>
                 </ul>

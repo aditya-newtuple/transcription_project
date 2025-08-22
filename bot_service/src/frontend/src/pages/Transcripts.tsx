@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { mockApiService } from '../services/mockApi';
 import { Transcript } from '../types';
@@ -20,6 +20,7 @@ import TranscriptPlayer from '../components/TranscriptPlayer';
 
 const Transcripts: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
@@ -32,6 +33,14 @@ const Transcripts: React.FC = () => {
   useEffect(() => {
     fetchTranscripts();
   }, [user]);
+
+  useEffect(() => {
+    // Check if upload modal should be opened from URL parameter
+    const shouldOpenUpload = searchParams.get('upload');
+    if (shouldOpenUpload === 'true') {
+      setShowUpload(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     filterTranscripts();
@@ -188,7 +197,7 @@ Thank you for using TranscribeAI.`;
                 placeholder="Search transcripts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="flex items-center space-x-2">
@@ -196,7 +205,7 @@ Thank you for using TranscribeAI.`;
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Status</option>
                 <option value="completed">Completed</option>
