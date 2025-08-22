@@ -31,9 +31,7 @@ services:
       context: ./bot_service
       dockerfile: ./dockerfiles/ui.Dockerfile
     env_file:
-      - ./bot_service/src/frontend/etc/.env
-    # volumes:
-    #   - ./common:/app/common
+      - ./bot_service/src/frontend/.env
     healthcheck:
       test: curl --fail http://localhost:3000 || exit 1
       interval: 40s
@@ -47,7 +45,7 @@ services:
     dns:
       - 8.8.8.8
     restart: "unless-stopped"
-    command: ["npm", "start"]
+    command: ["serve", "-s", "dist", "-l", "3000"]
     depends_on:
       - bot-api-service
 
