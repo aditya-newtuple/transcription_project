@@ -1,0 +1,25 @@
+from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel
+
+from common.models import BatchStatus
+from files.models.response import FileResponse
+
+
+class JobResponse(BaseModel):
+    id: int
+    created_by: int
+    status: BatchStatus
+    total_count: int
+    created_at: datetime
+    started_at: Optional[datetime]
+    finished_at: Optional[datetime]
+    message: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class JobWithFilesResponse(JobResponse):
+    files: List[FileResponse]

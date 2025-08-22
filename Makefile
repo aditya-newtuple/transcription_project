@@ -152,7 +152,7 @@ install-dependencies:
 # --- Local Development & Testing ---
 run-application-backend:
 	@echo "Running the application backend locally..."
-	python3 ${GIT_ROOT}/bot_service/src/backend/main.py -e ${GIT_ROOT}/bot_service/src/backend/etc/.env
+	cd ${GIT_ROOT}/bot_service/src/backend && python3 main.py -e ./etc/.env
 
 run-application-frontend:
 	@echo "Running the application frontend locally..."

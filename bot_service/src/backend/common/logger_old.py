@@ -107,10 +107,10 @@ class Logger:
         # Set formatters for shell and file
         # self.set_formatter(self.logger, self.otel_fmt_file)
 
-        self.set_formatter(self.shell_handler, self.fmt_file)
+        self.set_formatter(self.shell_handler, self.otel_fmt_file)
         self.set_formatter(self.file_handler, self.otel_fmt_file)
 
-        self.logger.addHandler(self.file_handler)
+        # self.logger.addHandler(self.file_handler)
         self.logger.addHandler(self.shell_handler)
 
         if self.ENABLE_JSON_LOGGER:

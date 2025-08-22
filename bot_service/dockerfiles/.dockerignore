@@ -33,3 +33,8 @@
 **/values.dev.yaml
 LICENSE
 README.md
+
+# Ignore specific etc directories
+src/backend/etc/input/
+src/backend/etc/output/
+src/backend/etc/models/

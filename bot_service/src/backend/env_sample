@@ -21,6 +21,12 @@ ANTHROPIC_MODEL_NAME=""
 GEMINI_API_KEY="AIza1pII"
 GEMINI_MODEL_NAME="gemini-1.5-flash-002"
 
+# Transcriber Configuration
+TRANSCRIBER_MODEL_NAME="large-v2"
+TRANSCRIBER_DEVICE="cpu"
+TRANSCRIBER_COMPUTE_TYPE="int8"
+TRANSCRIBER_MODELS_DIR=""  # Optional, defaults to etc/models
+
 #API handler
 API_CONFIG_FILE=""
 OPENAPI_SPEC_DIR="./store/api_specs"

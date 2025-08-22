@@ -11,7 +11,7 @@ from common.configuration import Configuration
 from common.logger import _logger_instance, logger
 from database.manager import DatabaseServiceManager
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -21,9 +21,21 @@ from health.manager import HealthServiceManager
 from LLM.manager import LLMServiceManager
 from metrics.controller import MetricsRestController
 from metrics.manager import MetricsService
+from transcriber.controller import TranscriberRestController
+from transcriber.manager import TranscriberServiceManager
+from jobs.manager import JobManager
+from jobs.db_models import JobModelService
+from jobs.controller import JobsRestController
 from user.controller import UserRestController
 from user.db_models import UserModelService
 from user.manager import UserServiceManager
+from files.db_models import FileModelService
+from transcripts.db_models import TranscriptModelService
+from common.redis import RedisManager
+from files.manager import FileManager
+from files.controller import FilesRestController
+from transcripts.manager import TranscriptManager
+from transcripts.controller import TranscriptsRestController
 
 parser = ArgumentParser(description="Runs the BOT service")
 parser.add_argument("-e", "--env", help="Path to .env file", default="./etc/.env")
@@ -52,12 +64,50 @@ health_rest_contoller = HealthRestController(health_service_manager).prepare(app
 database_service_manager = DatabaseServiceManager(config)
 llm_service_manager = LLMServiceManager()
 
+# Initialize transcriber service with configuration from environment
+transcriber_service_manager = TranscriberServiceManager(config_env.transcriber_configuration)
+
+# --- Define a dependency that returns the singleton ---
+def get_transcriber() -> TranscriberServiceManager:
+    return transcriber_service_manager
 
 user_db_model_service = UserModelService(database_service_manager)
 user_service_manager = UserServiceManager(user_db_model_service, config)
 user_rest_controller = UserRestController(user_service_manager, database_service_manager)
 user_rest_controller.prepare(app_router)
 
+transcriber_rest_controller = TranscriberRestController(
+    transcriber_manager=transcriber_service_manager,                 
+    get_transcriber_dep=get_transcriber,     
+)
+transcriber_rest_controller.prepare(app_router)
+
+#Files service
+file_model_service = FileModelService(database_service_manager)
+
+# Transcript service
+transcript_model_service = TranscriptModelService(database_service_manager)
+
+# Initialize Redis manager
+# redis_manager = RedisManager(config)
+
+# Jobs service
+job_model_service = JobModelService(database_service_manager)
+job_manager = JobManager(job_model_service, file_model_service, transcriber_service_manager, transcript_model_service, database_service_manager.redis_db_service())
+jobs_rest_controller = JobsRestController(job_manager)
+jobs_rest_controller.prepare(app_router)
+
+# Files service
+file_manager = FileManager(file_model_service, job_manager)
+files_rest_controller = FilesRestController(file_manager, config)
+files_rest_controller.prepare(app_router)
+
+# Transcripts service
+transcript_manager = TranscriptManager(transcript_model_service)
+transcripts_rest_controller = TranscriptsRestController(transcript_manager)
+transcripts_rest_controller.prepare(app_router)
+
+# Metrics service
 metrics_service_manager = MetricsService()
 metrics_rest_controller = MetricsRestController(metrics_service_manager).prepare(app_router, Depends(user_rest_controller.get_current_username))
 
@@ -76,4 +126,11 @@ app.add_middleware(
 app.include_router(app_router, prefix="/v1/api")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host=config_env.server_configuration.host, timeout_keep_alive=600, port=int(config_env.server_configuration.port), reload=True)
+    uvicorn.run(
+        "main:app",                       # keep original style
+        host=config_env.server_configuration.host,
+        port=int(config_env.server_configuration.port),
+        timeout_keep_alive=7200,
+        reload=False,                     # ensure no reloader in Docker
+        log_level="info",
+    )
