@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Upload, FileAudio, FileVideo, Loader2, CheckCircle, AlertCircle, Play, Pause, Volume2, Edit2, Check, X, Eye, Plus, Search, ChevronUp, ChevronDown, Download, Info } from 'lucide-react';
-import { createJob, getJob, getFile, listFiles } from '../services/apiService';
+import { Upload, FileAudio, FileVideo, Loader2, CheckCircle, AlertCircle, Play, Pause, Volume2, Edit2, Check, X, Eye, Plus, Search, ChevronUp, ChevronDown, Download, Info, Trash2 } from 'lucide-react';
+import { createJob, getJob, getFile, listFiles, deleteFile } from '../services/apiService';
 import { CreateJobResponse, JobWithFiles, FileWithTranscripts, FileInfo } from '../types';
 
 const Demo: React.FC = () => {
@@ -341,6 +341,19 @@ const Demo: React.FC = () => {
     setStatusFilter(status);
   };
 
+  const handleDeleteFile = async (fileId: number, fileName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+      try {
+        await deleteFile(fileId);
+        // Refresh the files list after successful deletion
+        fetchFiles();
+      } catch (err) {
+        console.error('Failed to delete file:', err);
+        alert('Failed to delete file. Please try again.');
+      }
+    }
+  };
+
   // Close download dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -499,24 +512,39 @@ const Demo: React.FC = () => {
                       {new Date(file.queued_at).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {file.status === 'succeeded' ? (
+                      <div className="flex items-center space-x-2">
+                        {file.status === 'succeeded' ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewFile(file.id);
+                            }}
+                            className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>View</span>
+                          </button>
+                        ) : file.status === 'failed' ? (
+                          <div className="text-red-600 text-xs">
+                            {file.message ? 'Error occurred' : 'Failed'}
+                          </div>
+                        ) : (
+                          <div className="text-gray-400 text-xs">Processing...</div>
+                        )}
+                        
+                        {/* Delete button - show for all files */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleViewFile(file.id);
+                            handleDeleteFile(file.id, file.source_name);
                           }}
-                          className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                          className="text-red-600 hover:text-red-900 flex items-center space-x-1"
+                          title="Delete file"
                         >
-                          <Eye className="w-4 h-4" />
-                          <span>View</span>
+                          <Trash2 className="w-4 h-4" />
+                          <span>Delete</span>
                         </button>
-                      ) : file.status === 'failed' ? (
-                        <div className="text-red-600 text-xs">
-                          {file.message ? 'Error occurred' : 'Failed'}
-                        </div>
-                      ) : (
-                        <div className="text-gray-400 text-xs">Processing...</div>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -691,7 +719,7 @@ const Demo: React.FC = () => {
                       className="w-full rounded-lg shadow-sm"
                       controls
                     >
-                      <source src={`http://0.0.0.0:8081/v1/api/files/${currentFile.id}/download`} type={currentFile.mime_type} />
+                      <source src={`${import.meta.env.VITE_API_BASE_URL || 'http://0.0.0.0:8081/'}v1/api/files/${currentFile.id}/download`} type={currentFile.mime_type} />
                       Your browser does not support the video element.
                     </video>
                   ) : (
@@ -706,7 +734,7 @@ const Demo: React.FC = () => {
                       className="w-full"
                       controls
                     >
-                      <source src={`http://0.0.0.0:8081/v1/api/files/${currentFile.id}/download`} type={currentFile.mime_type} />
+                      <source src={`${import.meta.env.VITE_API_BASE_URL || 'http://0.0.0.0:8081/'}v1/api/files/${currentFile.id}/download`} type={currentFile.mime_type} />
                       Your browser does not support the audio element.
                     </audio>
                   )}

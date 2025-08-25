@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { CreateJobResponse, JobWithFiles, FileWithTranscripts, FileInfo } from '../types';
 
+// Get API base URL from environment variable
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://0.0.0.0:8081/';
+
 // Simple API service with just the requested job creation endpoint
 export const createJob = async (currentUserId: number, files: File[]): Promise<CreateJobResponse> => {
   const formData = new FormData();
@@ -11,7 +14,7 @@ export const createJob = async (currentUserId: number, files: File[]): Promise<C
   });
 
   const response = await axios.post<CreateJobResponse>(
-    'http://0.0.0.0:8081/v1/api/jobs',
+    `${API_BASE_URL}v1/api/jobs`,
     formData,
     { 
       params: { current_user_id: currentUserId },
@@ -25,19 +28,19 @@ export const createJob = async (currentUserId: number, files: File[]): Promise<C
 
 // Get job details with files
 export const getJob = async (jobId: number): Promise<JobWithFiles> => {
-  const response = await axios.get<JobWithFiles>(`http://0.0.0.0:8081/v1/api/jobs/${jobId}`);
+  const response = await axios.get<JobWithFiles>(`${API_BASE_URL}v1/api/jobs/${jobId}`);
   return response.data;
 };
 
 // Get file details with transcripts
 export const getFile = async (fileId: number): Promise<FileWithTranscripts> => {
-  const response = await axios.get<FileWithTranscripts>(`http://0.0.0.0:8081/v1/api/files/${fileId}`);
+  const response = await axios.get<FileWithTranscripts>(`${API_BASE_URL}v1/api/files/${fileId}`);
   return response.data;
 };
 
 // List all files
 export const listFiles = async (pageSize: number = 10): Promise<FileInfo[]> => {
-  const response = await axios.get<FileInfo[]>(`http://0.0.0.0:8081/v1/api/files`, {
+  const response = await axios.get<FileInfo[]>(`${API_BASE_URL}v1/api/files`, {
     params: { page_size: pageSize }
   });
   return response.data;
@@ -50,6 +53,11 @@ export const getDiskSpace = async (): Promise<{
   percentage: number;
   status: string;
 }> => {
-  const response = await axios.get(`http://0.0.0.0:8081/v1/api/disk-space`);
+  const response = await axios.get(`${API_BASE_URL}v1/api/disk-space`);
   return response.data;
+};
+
+// Delete a file by ID
+export const deleteFile = async (fileId: number): Promise<void> => {
+  await axios.delete(`${API_BASE_URL}v1/api/files/${fileId}`);
 };
