@@ -200,6 +200,11 @@ const Demo: React.FC = () => {
     }
   };
 
+  const handleMediaSeeking = () => {
+    // This will be called when user starts seeking
+    console.log('Seeking started');
+  };
+
   const handleMediaSeeked = () => {
     const mediaElement = isVideo ? videoRef.current : audioRef.current;
     if (mediaElement) {
@@ -207,20 +212,22 @@ const Demo: React.FC = () => {
       setCurrentTime(newTime);
       
       // Force update subtitle highlighting immediately after seeking
-      if (currentFile && currentFile.transcripts.length > 0) {
-        const srtTranscript = currentFile.transcripts.find(t => t.format === 'srt');
-        if (srtTranscript) {
-          const subtitles = parseSRT(srtTranscript.content);
-          const currentSubIndex = subtitles.findIndex(sub => newTime >= sub.start && newTime <= sub.end);
-          if (currentSubIndex !== -1) {
-            setCurrentSubtitle(subtitles[currentSubIndex].text);
-            setCurrentSubtitleIndex(currentSubIndex);
-          } else {
-            setCurrentSubtitle('');
-            setCurrentSubtitleIndex(-1);
+      setTimeout(() => {
+        if (currentFile && currentFile.transcripts.length > 0) {
+          const srtTranscript = currentFile.transcripts.find(t => t.format === 'srt');
+          if (srtTranscript) {
+            const subtitles = parseSRT(srtTranscript.content);
+            const currentSubIndex = subtitles.findIndex(sub => newTime >= sub.start && newTime <= sub.end);
+            if (currentSubIndex !== -1) {
+              setCurrentSubtitle(subtitles[currentSubIndex].text);
+              setCurrentSubtitleIndex(currentSubIndex);
+            } else {
+              setCurrentSubtitle('');
+              setCurrentSubtitleIndex(-1);
+            }
           }
         }
-      }
+      }, 50); // Small delay to ensure seeking is complete
     }
   };
 
@@ -676,6 +683,7 @@ const Demo: React.FC = () => {
                     <video
                       ref={videoRef}
                       onTimeUpdate={handleMediaTimeUpdate}
+                      onSeeking={handleMediaSeeking}
                       onSeeked={handleMediaSeeked}
                       onPlay={handleMediaPlay}
                       onPause={handleMediaPause}
@@ -690,6 +698,7 @@ const Demo: React.FC = () => {
                     <audio
                       ref={audioRef}
                       onTimeUpdate={handleMediaTimeUpdate}
+                      onSeeking={handleMediaSeeking}
                       onSeeked={handleMediaSeeked}
                       onPlay={handleMediaPlay}
                       onPause={handleMediaPause}

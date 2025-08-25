@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from common.configuration import Configuration
 from auth.deps import get_current_user
 from common.models import JobStatus
@@ -76,8 +76,8 @@ class FilesRestController():
                 )
 
         @app.get("/files/{file_id}/download", tags=["files"])
-        def download_file(file_id: int) -> Response:
-            """Download/serve a file by its ID"""
+        def download_file(file_id: int, request: Request) -> Response:
+            """Download/serve a file by its ID with support for range requests"""
             file = self.file_manager.get_file(file_id)
             if not file:
                 raise HTTPException(
@@ -92,16 +92,58 @@ class FilesRestController():
                     detail=f"File not found on disk: {file.path}",
                 )
             
-            # Read file content
-            with open(file_path, 'rb') as f:
-                content = f.read()
+            file_size = file_path.stat().st_size
             
-            # Return file with appropriate headers
-            return Response(
-                content=content,
-                media_type=file.mime_type,
-                headers={
-                    "Content-Disposition": f"inline; filename={file.source_name}",
-                    "Content-Length": str(len(content))
-                }
-            )
+            # Check for range request
+            range_header = request.headers.get('range')
+            if range_header:
+                try:
+                    # Parse range header (e.g., "bytes=0-1023")
+                    range_str = range_header.replace('bytes=', '')
+                    start, end = range_str.split('-')
+                    start = int(start)
+                    end = int(end) if end else file_size - 1
+                    
+                    # Validate range
+                    if start >= file_size or end >= file_size or start > end:
+                        raise HTTPException(
+                            status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+                            detail="Invalid range request"
+                        )
+                    
+                    # Read requested range
+                    with open(file_path, 'rb') as f:
+                        f.seek(start)
+                        content = f.read(end - start + 1)
+                    
+                    # Return partial content
+                    return Response(
+                        content=content,
+                        media_type=file.mime_type,
+                        status_code=status.HTTP_206_PARTIAL_CONTENT,
+                        headers={
+                            "Content-Range": f"bytes {start}-{end}/{file_size}",
+                            "Content-Length": str(len(content)),
+                            "Accept-Ranges": "bytes",
+                            "Content-Disposition": f"inline; filename={file.source_name}"
+                        }
+                    )
+                except (ValueError, IndexError):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid range header format"
+                    )
+            else:
+                # No range request - return full file
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+                
+                return Response(
+                    content=content,
+                    media_type=file.mime_type,
+                    headers={
+                        "Content-Length": str(len(content)),
+                        "Accept-Ranges": "bytes",
+                        "Content-Disposition": f"inline; filename={file.source_name}"
+                    }
+                )
