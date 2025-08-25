@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from common.configuration import Configuration
 from auth.deps import get_current_user
 from common.models import JobStatus
@@ -74,3 +74,34 @@ class FilesRestController():
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"File {file_id} not found",
                 )
+
+        @app.get("/files/{file_id}/download", tags=["files"])
+        def download_file(file_id: int) -> Response:
+            """Download/serve a file by its ID"""
+            file = self.file_manager.get_file(file_id)
+            if not file:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"File {file_id} not found",
+                )
+            
+            file_path = Path(file.path)
+            if not file_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"File not found on disk: {file.path}",
+                )
+            
+            # Read file content
+            with open(file_path, 'rb') as f:
+                content = f.read()
+            
+            # Return file with appropriate headers
+            return Response(
+                content=content,
+                media_type=file.mime_type,
+                headers={
+                    "Content-Disposition": f"inline; filename={file.source_name}",
+                    "Content-Length": str(len(content))
+                }
+            )

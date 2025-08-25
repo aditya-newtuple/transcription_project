@@ -8,7 +8,8 @@ import {
   Users, 
   LogOut,
   Menu,
-  X
+  X,
+  Play
 } from 'lucide-react';
 import HilliardLogo from '../assets/Hilliard-Logo.svg';
 import { useState } from 'react';
@@ -27,6 +28,7 @@ const Layout: React.FC = () => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Transcripts', href: '/transcripts', icon: FileText },
+    { name: 'Demo', href: '/demo', icon: Play },
     { name: 'Settings', href: '/settings', icon: Settings },
     ...(user?.role === 'admin' ? [{ name: 'Admin', href: '/admin', icon: Users }] : [])
   ];

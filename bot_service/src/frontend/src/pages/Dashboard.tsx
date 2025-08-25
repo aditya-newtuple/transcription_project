@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { mockApiService } from '../services/mockApi';
+import { getDiskSpace } from '../services/apiService';
 import { DashboardStats, Transcript } from '../types';
 import { 
   FileText, 
   Clock, 
   CheckCircle, 
-  Users,
+  HardDrive,
   TrendingUp,
   Activity,
   Upload,
-  Play
+  Play,
+  Users
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -19,6 +21,7 @@ const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(true);
+  const [diskSpace, setDiskSpace] = useState<{ used: number; total: number; percentage: number } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +42,30 @@ const Dashboard: React.FC = () => {
 
     fetchData();
   }, [user]);
+
+  // Get disk space information from backend API
+  useEffect(() => {
+    const fetchDiskSpace = async () => {
+      try {
+        const diskData = await getDiskSpace();
+        setDiskSpace({
+          used: diskData.used_gb,
+          total: diskData.total_gb,
+          percentage: diskData.percentage
+        });
+      } catch (error) {
+        console.error('Failed to fetch disk space:', error);
+        // Fallback to mock data if API fails
+        setDiskSpace({
+          used: 250,
+          total: 500,
+          percentage: 50
+        });
+      }
+    };
+
+    fetchDiskSpace();
+  }, []);
 
   if (loading) {
     return (
@@ -73,14 +100,15 @@ const Dashboard: React.FC = () => {
       bgColor: 'bg-green-50',
       textColor: 'text-green-600'
     },
-    ...(user?.role === 'admin' ? [{
-      name: 'Total Users',
-      value: stats?.totalUsers || 0,
-      icon: Users,
+    {
+      name: 'Disk Space',
+      value: diskSpace ? `${diskSpace.used}GB / ${diskSpace.total}GB` : 'Loading...',
+      icon: HardDrive,
       color: 'bg-purple-500',
       bgColor: 'bg-purple-50',
-      textColor: 'text-purple-600'
-    }] : [])
+      textColor: 'text-purple-600',
+      subtitle: diskSpace ? `${diskSpace.percentage}% used` : ''
+    }
   ];
 
   const getStatusColor = (status: string) => {
@@ -127,15 +155,37 @@ const Dashboard: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">{stat.name}</p>
                   <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
+                  {stat.subtitle && (
+                    <p className="text-sm text-gray-500 mt-1">{stat.subtitle}</p>
+                  )}
                 </div>
                 <div className={`p-3 rounded-lg ${stat.bgColor}`}>
                   <Icon className={`w-6 h-6 ${stat.textColor}`} />
                 </div>
               </div>
-              <div className="mt-4 flex items-center">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">+12% from last month</span>
-              </div>
+              {stat.name === 'Disk Space' && diskSpace && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                    <span>Used: {diskSpace.used}GB</span>
+                    <span>Free: {diskSpace.total - diskSpace.used}GB</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        diskSpace.percentage > 80 ? 'bg-red-500' : 
+                        diskSpace.percentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
+                      }`}
+                      style={{ width: `${diskSpace.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {!stat.subtitle && stat.name !== 'Disk Space' && (
+                <div className="mt-4 flex items-center">
+                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                  <span className="text-sm text-green-600">+12% from last month</span>
+                </div>
+              )}
             </div>
           );
         })}

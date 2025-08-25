@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Request
 from health.manager import HealthServiceManager
 from health.models import HealthResponse
+from monitoring.prometheus import update_disk_metrics
 
 
 class HealthRestController:
@@ -25,3 +26,8 @@ class HealthRestController:
             response = await request.body()
             print(f"Request body: {response.decode()}")
             return await self._health_service_manager.ping()
+
+        @app.get("/disk-space")
+        async def get_disk_space():
+            """Returns disk space information"""
+            return update_disk_metrics()

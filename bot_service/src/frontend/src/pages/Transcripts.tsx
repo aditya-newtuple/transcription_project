@@ -250,7 +250,7 @@ Thank you for using TranscribeAI.`;
             {filteredTranscripts.map((transcript) => (
               <div key={transcript.id} className="p-6 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 flex-1 min-w-0">
+                  <div className="flex items-center space-x-4 flex-1 min-w-0 hover:cursor-pointer"  onClick={() => setSelectedTranscript(transcript)}>
                     <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       {transcript.fileType === 'video' ? (
                         <Play className="w-6 h-6 text-blue-600" />

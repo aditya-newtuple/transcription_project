@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Transcripts from './pages/Transcripts';
+import Demo from './pages/Demo';
 import Settings from './pages/Settings';
 import Admin from './pages/Admin';
 
@@ -35,6 +36,7 @@ const AppContent: React.FC = () => {
       }>
         <Route index element={<Dashboard />} />
         <Route path="transcripts" element={<Transcripts />} />
+        <Route path="demo" element={<Demo />} />
         <Route path="settings" element={<Settings />} />
         <Route path="admin" element={
           <ProtectedRoute adminOnly>
