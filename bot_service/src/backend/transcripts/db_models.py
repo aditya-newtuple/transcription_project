@@ -1,11 +1,10 @@
 # transcripts/db_models.py
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, Text, and_, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import text
 
 from common.logger import logger
 from common.models import TranscriptFormat
@@ -66,7 +65,7 @@ class Transcript(Base):
     transcription_process_duration: Mapped[Optional[int]] = mapped_column(Integer)
     transcription_model: Mapped[Optional[str]] = mapped_column(String)
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger)  
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=text("now()"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
 
     file = relationship("File", back_populates="transcripts", lazy="joined")
 

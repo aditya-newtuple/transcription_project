@@ -52,3 +52,6 @@ class FileWithTranscriptsResponse(BaseModel):
     tags: Optional[str]
     transcripts: List[TranscriptResponse]
 
+    class Config:
+        from_attributes = True
+

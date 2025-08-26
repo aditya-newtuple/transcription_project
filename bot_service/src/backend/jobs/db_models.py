@@ -1,12 +1,11 @@
 # jobs/db_models.py
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional
 
 from sqlalchemy import BigInteger, DateTime, Enum, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, joinedload
-from sqlalchemy.sql import text
 
 from common.logger import logger
 from common.models import BatchStatus, JobStatus
@@ -54,7 +53,7 @@ class Job(Base):
 
     title: Mapped[Optional[str]] = mapped_column(String)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=text("now()"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     message: Mapped[Optional[str]] = mapped_column(Text)

@@ -1,12 +1,11 @@
 # files/db_models.py
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
-from sqlalchemy.sql import text
 
 from common.logger import logger
 from common.models import JobStatus
@@ -60,7 +59,7 @@ class File(Base):
     path: Mapped[Optional[str]] = mapped_column(String)
     mimetype: Mapped[Optional[str]] = mapped_column(String)
     bytes: Mapped[Optional[int]] = mapped_column(BigInteger)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=text("now()"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     status: Mapped[JobStatus] = mapped_column(
@@ -69,7 +68,7 @@ class File(Base):
         server_default="queued",
     )
 
-    queued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=text("now()"))
+    queued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     message: Mapped[Optional[str]] = mapped_column(Text)
