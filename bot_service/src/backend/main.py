@@ -9,9 +9,9 @@ import uvicorn
 from auth.manager import AuthManager
 from common.configuration import Configuration
 from common.logger import _logger_instance, logger
-from database.manager import DatabaseServiceManager
+from database.manager import DatabaseServiceManager, Base
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -31,7 +31,6 @@ from user.db_models import UserModelService
 from user.manager import UserServiceManager
 from files.db_models import FileModelService
 from transcripts.db_models import TranscriptModelService
-from common.redis import RedisManager
 from files.manager import FileManager
 from files.controller import FilesRestController
 from transcripts.manager import TranscriptManager
@@ -63,6 +62,16 @@ health_rest_contoller = HealthRestController(health_service_manager).prepare(app
 
 database_service_manager = DatabaseServiceManager(config)
 llm_service_manager = LLMServiceManager()
+
+# Create base tables
+try:
+    if Base:
+        logger.critical("Trying creating base tables for files..", extra={"tags": "create_base_tables"})
+        Base.metadata.create_all(bind=database_service_manager.postgres_db_service().engine)
+except BaseException as e:
+    error = {"error": e}
+    logger.critical(f"Could not create base tables for files due to \n {error}, db operations won't work!")
+
 
 # Initialize transcriber service with configuration from environment
 transcriber_service_manager = TranscriberServiceManager(config_env.transcriber_configuration)

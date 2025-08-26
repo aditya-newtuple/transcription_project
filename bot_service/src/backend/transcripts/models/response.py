@@ -3,20 +3,22 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from common.models import TranscriptFormat
-
 
 class TranscriptResponse(BaseModel):
     id: int
     file_id: int
     version: int
-    format: TranscriptFormat
-    content: Optional[str]
+    srt_content: Optional[str]
+    text_content: Optional[str]
+    approved_by: Optional[str]
+    approved_at: Optional[datetime]
+    active: bool
+    message: Optional[str]
+    language_hint: Optional[str]
+    transcription_process_duration: Optional[int]
+    transcription_model: Optional[str]
     created_at: datetime
     created_by: Optional[int]
-    approved_at: Optional[datetime]
-    approved_by: Optional[int]
-    is_approved: bool
 
     class Config:
         from_attributes = True

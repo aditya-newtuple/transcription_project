@@ -18,8 +18,11 @@ class FileManager:
         file = self.file_model_service.create_file(request, created_by)
         return FileResponse.from_orm(file)
 
-    def update_file_paths(self, file_id: int, source_path: str, source_name: str, source_mime: str, source_bytes: int) -> Optional[FileResponse]:
-        file = self.file_model_service.update_file_paths(file_id, source_path, source_name, source_mime, source_bytes)
+    def update_file_paths(self, file_id: int, file_path: str, file_name: str, mimetype: str, bytes: int, 
+                         language_hint: Optional[str] = None, duration_sec: Optional[int] = None, 
+                         tags: Optional[str] = None) -> Optional[FileResponse]:
+        file = self.file_model_service.update_file_paths(file_id, file_path, file_name, mimetype, bytes, 
+                                                       language_hint, duration_sec, tags)
         if not file:
             return None
         return FileResponse.from_orm(file)

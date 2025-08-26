@@ -3,10 +3,9 @@ import os
 from pathlib import Path
 import time
 import uuid
-import logging
-
+import time
 from fastapi import HTTPException, UploadFile
-from common.models import BatchStatus, JobStatus, TranscriptFormat
+from common.models import BatchStatus, JobStatus
 from jobs.db_models import JobModelService, Job
 from jobs.models.request import CreateJobRequest, FileUploadInfo
 from jobs.models.response import JobResponse, JobWithFilesResponse
@@ -15,10 +14,8 @@ from files.models.request import CreateFileRequest
 from transcriber.manager import TranscriberServiceManager
 from transcripts.db_models import TranscriptModelService
 from transcripts.models.request import CreateTranscriptRequest
-from common.redis import RedisManager
 from common.logger import logger
-from sqlalchemy.orm import joinedload
-from database.manager import DatabaseServiceManager, RedisDBService
+from database.manager import RedisDBService
 
 
 # Constants for file upload limitations
@@ -48,7 +45,7 @@ class JobManager:
         if os.path.exists('/app/backend'):
             self.base_path = Path('/app/backend')
         else:
-            self.base_path = Path(os.getcwd()).resolve()
+            self.base_path = Path.cwd().resolve()
             if self.base_path.name == 'src':
                 self.base_path = self.base_path.parent
             elif self.base_path.name == 'backend':
@@ -197,13 +194,14 @@ class JobManager:
             )
             file = self.file_model_service.create_file(file_request, created_by)
             
-            # Update file paths with absolute path
+            # Update file paths with absolute path and additional metadata
             file = self.file_model_service.update_file_paths(
                 file_id=file.id,
                 path=str(self._get_absolute_path(file_info.source_path)),
-                source_name=file_info.source_name,
-                mime_type=file_info.source_mime,
-                bytes=file_info.source_bytes
+                file_name=file_info.source_name,
+                mimetype=file_info.source_mime,
+                bytes=file_info.source_bytes,
+                tags="audio,transcription"  # Default tags
             )
 
             # Queue the file for transcription
@@ -257,6 +255,8 @@ class JobManager:
             self.file_model_service.update_file_status(file_id, JobStatus.RUNNING)
             
             try:
+                transcription_start_time = time.time()
+                
                 # Perform transcription
                 logger.info(f"Starting transcription for file {file_id}")
                 text_file_path, subtitle_file_path, transcription_info = self.transcriber_service.transcribe_file(
@@ -272,39 +272,60 @@ class JobManager:
                 if not subtitle_file_path.exists():
                     raise FileNotFoundError(f"Subtitle output file not found: {subtitle_file_path}")
 
-                # Create transcript records for both formats
+                # Create single transcript record with both formats
                 try:
-                    # Store TXT transcript
+                    # Read both transcript contents
                     with open(text_file_path, 'r', encoding='utf-8') as f:
                         txt_content = f.read()
                         if not txt_content.strip():
                             raise ValueError("Empty text transcript generated")
-                        
-                        logger.info(f"Creating TXT transcript for file {file_id}")
-                        txt_transcript_request = CreateTranscriptRequest(
-                            file_id=file_id,
-                            format=TranscriptFormat.TXT,
-                            content=txt_content,
-                            version=1
-                        )
-                        self.transcript_model_service.create_transcript(txt_transcript_request, created_by)
-                        logger.info(f"TXT transcript created for file {file_id}")
-
-                    # Store SRT transcript
+                    
                     with open(subtitle_file_path, 'r', encoding='utf-8') as f:
                         srt_content = f.read()
                         if not srt_content.strip():
                             raise ValueError("Empty SRT transcript generated")
-                        
-                        logger.info(f"Creating SRT transcript for file {file_id}")
-                        srt_transcript_request = CreateTranscriptRequest(
-                            file_id=file_id,
-                            format=TranscriptFormat.SRT,
-                            content=srt_content,
-                            version=1
+                    
+                    # Calculate actual transcription duration (from when we started processing)
+                    actual_transcription_duration = int(time.time() - transcription_start_time)
+                    
+                    logger.info(f"Creating transcript record for file {file_id} with both TXT and SRT content")
+                    transcript_request = CreateTranscriptRequest(
+                        file_id=file_id,
+                        version=1,
+                        text_content=txt_content,
+                        srt_content=srt_content,
+                        language_hint="en",
+                        transcription_process_duration=actual_transcription_duration,
+                        transcription_model=self.transcriber_service.get_model_name(),
+                        message="Transcription completed successfully with both TXT and SRT formats"
+                    )
+
+                    transcript = self.transcript_model_service.create_transcript(transcript_request, created_by)
+                    
+                    # Update transcript with additional metadata using the update function
+                    if transcript:
+                        # Update transcript with additional metadata
+                        updated_transcript = self.transcript_model_service.update_transcript_metadata(
+                            transcript_id=transcript.id,
+                            duration=actual_transcription_duration,
+                            model=self.transcriber_service.get_model_name(),
+                            language="en",
+                            message=f"Transcription completed successfully."
                         )
-                        self.transcript_model_service.create_transcript(srt_transcript_request, created_by)
-                        logger.info(f"SRT transcript created for file {file_id}")
+                        
+                        if updated_transcript:
+                            logger.info(f"Transcript metadata updated successfully for transcript {transcript.id}")
+                        else:
+                            logger.warning(f"Failed to update transcript metadata for transcript {transcript.id}")
+                        
+                        # Update file with transcription metadata
+                        self.file_model_service.update_transcription_metadata(
+                            file_id=file_id,
+                            tags=f"audio,transcription"
+                        )
+                        
+                    
+                    logger.info(f"Transcript record created for file {file_id} with both formats and metadata")
 
                 except Exception as transcript_error:
                     logger.error(f"Failed to save transcripts for file {file_id}: {str(transcript_error)}")

@@ -6,7 +6,6 @@ from pathlib import Path
 
 from common.configuration import Configuration
 from common.logger import logger
-from common.redis import RedisManager
 from database.manager import DatabaseServiceManager
 from files.db_models import FileModelService
 from jobs.db_models import JobModelService

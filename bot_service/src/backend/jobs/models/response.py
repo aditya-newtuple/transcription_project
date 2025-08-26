@@ -11,9 +11,9 @@ class JobResponse(BaseModel):
     id: int
     created_by: int
     status: BatchStatus
-    total_count: int
+    title: Optional[str]
     created_at: datetime
-    started_at: Optional[datetime]
+    updated_at: Optional[datetime]
     finished_at: Optional[datetime]
     message: Optional[str]
 
@@ -22,4 +22,12 @@ class JobResponse(BaseModel):
 
 
 class JobWithFilesResponse(JobResponse):
+    id: int
+    created_by: int
+    status: BatchStatus
+    title: Optional[str]
+    created_at: datetime
+    updated_at: Optional[datetime]
+    finished_at: Optional[datetime]
+    message: Optional[str]
     files: List[FileResponse]

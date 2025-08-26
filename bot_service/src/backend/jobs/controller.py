@@ -1,15 +1,10 @@
 from typing import List, Optional
-from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 
 from common.models import BatchStatus
 from jobs.manager import JobManager
 from jobs.models.response import JobResponse, JobWithFilesResponse
-from files.db_models import FileModelService
-from transcriber.manager import TranscriberServiceManager
-from transcripts.db_models import TranscriptModelService
-from common.redis import RedisManager
 
 
 class JobsRestController:

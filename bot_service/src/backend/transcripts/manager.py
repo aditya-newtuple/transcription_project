@@ -20,8 +20,8 @@ class TranscriptManager:
             return None
         return TranscriptResponse.from_orm(transcript)
 
-    def list_transcripts(self, file_id: Optional[int] = None, is_approved: Optional[bool] = None, page_size: int = 10) -> List[TranscriptResponse]:
-        transcripts = self.transcript_model_service.list_transcripts(file_id, is_approved, page_size)
+    def list_transcripts(self, file_id: Optional[int] = None, active: Optional[bool] = None, page_size: int = 10) -> List[TranscriptResponse]:
+        transcripts = self.transcript_model_service.list_transcripts(file_id, active, page_size)
         return [TranscriptResponse.from_orm(t) for t in transcripts]
 
     def approve_transcript(self, transcript_id: int, request: ApproveTranscriptRequest) -> Optional[TranscriptResponse]:

@@ -27,7 +27,7 @@ class TranscriberRestController:
         self.get_transcriber_dep = get_transcriber_dep
         
         # Initialize directory paths
-        workspace_root = Path(os.getcwd()).resolve()
+        workspace_root = Path.cwd().resolve()
         self.etc_directory = workspace_root / "etc"
         self.input_directory = self.etc_directory / "input"
         self.output_directory = self.etc_directory / "output"

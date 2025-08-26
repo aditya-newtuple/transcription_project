@@ -39,7 +39,7 @@ class TranscriptsRestController:
             """
             return self.transcript_manager.list_transcripts(file_id, is_approved, page_size)
 
-        @app.post("/transcripts/{transcript_id}/approve", tags=["transcripts"], response_model=TranscriptResponse)
+        @app.put("/transcripts/{transcript_id}/approve", tags=["transcripts"], response_model=TranscriptResponse)
         def approve_transcript(
             transcript_id: int,
             request: ApproveTranscriptRequest,

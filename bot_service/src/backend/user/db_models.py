@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from common.logger import logger, tracer
-from database.manager import DatabaseServiceManager
+from database.manager import DatabaseServiceManager, Base
 from exceptions.db import DBException
 from exceptions.user import InactiveUser
 from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, inspect
@@ -9,7 +9,6 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 from user.models.interface import UserCreate
 
-Base = declarative_base()
 
 
 class User(Base):
@@ -35,15 +34,6 @@ class UserModelService:
         self.database_manager = database_service_manager
         self.current_db = self.database_manager.postgres_db_service()
         self.current_db_engine = self.current_db.engine
-
-        # try:
-        #     if Base:
-        #         logger.critical("Trying creating base tables for users..", extra={"tags": "create_base_tables"})
-        #         Base.metadata.create_all(bind=self.current_db_engine)
-
-        # except BaseException as e:
-        #     error = {"error": e}
-        #     logger.critical(f"Could not create base tables for users due to \n {error}, db operations won't work!")
 
     def get_user(self, username: str = None):
         """

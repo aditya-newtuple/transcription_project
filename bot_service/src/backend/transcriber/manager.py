@@ -56,7 +56,7 @@ class TranscriberServiceManager:
         self.config = config
         
         # Resolve models directory path
-        workspace_root = Path(os.getcwd()).resolve()
+        workspace_root = Path.cwd().resolve()
         etc_directory = workspace_root / "etc"
         self.models_directory = Path(config.models_directory or (etc_directory / "models")).resolve()
         self.model_instance_directory = (self.models_directory / config.model_name).resolve()
@@ -289,3 +289,7 @@ class TranscriberServiceManager:
             return sorted(candidate_directories, key=lambda d: d.stat().st_mtime, reverse=True)[0]
 
         return None
+    
+    def get_model_name(self) -> str:
+        """Get the name of the currently loaded model."""
+        return self.config.model_name
