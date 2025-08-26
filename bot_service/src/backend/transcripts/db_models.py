@@ -65,7 +65,7 @@ class Transcript(Base):
     transcription_process_duration: Mapped[Optional[int]] = mapped_column(Integer)
     transcription_model: Mapped[Optional[str]] = mapped_column(String)
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger)  
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now(UTC))
 
     file = relationship("File", back_populates="transcripts", lazy="joined")
 
@@ -166,8 +166,8 @@ class TranscriptModelService:
                 # Then activate this one
                 transcript.active = True
                 transcript.approved_by = approved_by
-                transcript.approved_at = datetime.utcnow()
-                transcript.message = f"Transcript approved by {approved_by} on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}. This transcript is now the active version for the file."
+                transcript.approved_at = datetime.now(UTC)
+                transcript.message = f"Transcript approved by {approved_by} on {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}. This transcript is now the active version for the file."
 
                 db.commit()
                 db.refresh(transcript)

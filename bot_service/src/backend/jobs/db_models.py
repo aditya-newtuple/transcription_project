@@ -53,7 +53,7 @@ class Job(Base):
 
     title: Mapped[Optional[str]] = mapped_column(String)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now(UTC))
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     message: Mapped[Optional[str]] = mapped_column(Text)
@@ -130,7 +130,7 @@ class JobModelService:
                     return None
 
                 job.status = status
-                job.updated_at = datetime.utcnow()
+                job.updated_at = datetime.now(UTC)
                 
                 # Add meaningful status messages
                 if status == BatchStatus.QUEUED:
@@ -139,13 +139,13 @@ class JobModelService:
                     job.message = "Job is currently processing audio files"
                 elif status == BatchStatus.COMPLETED:
                     job.message = "Job completed successfully, all files transcribed"
-                    job.finished_at = datetime.utcnow()
+                    job.finished_at = datetime.now(UTC)
                 elif status == BatchStatus.FAILED:
                     job.message = "Job failed during processing, check individual file statuses"
-                    job.finished_at = datetime.utcnow()
+                    job.finished_at = datetime.now(UTC)
                 elif status == BatchStatus.CANCELED:
                     job.message = "Job was canceled by user or system"
-                    job.finished_at = datetime.utcnow()
+                    job.finished_at = datetime.now(UTC)
 
                 db.commit()
                 db.refresh(job)

@@ -59,7 +59,7 @@ class File(Base):
     path: Mapped[Optional[str]] = mapped_column(String)
     mimetype: Mapped[Optional[str]] = mapped_column(String)
     bytes: Mapped[Optional[int]] = mapped_column(BigInteger)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now(UTC))
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     status: Mapped[JobStatus] = mapped_column(
@@ -68,7 +68,7 @@ class File(Base):
         server_default="queued",
     )
 
-    queued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=datetime.now(UTC))
+    queued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now(UTC))
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     message: Mapped[Optional[str]] = mapped_column(Text)
@@ -198,9 +198,9 @@ class FileModelService:
                 file.message = message
 
                 if status == JobStatus.RUNNING and not file.started_at:
-                    file.started_at = datetime.utcnow()
+                    file.started_at = datetime.now(UTC)
                 elif status in (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELED):
-                    file.finished_at = datetime.utcnow()
+                    file.finished_at = datetime.now(UTC)
 
                 db.commit()
                 db.refresh(file)
