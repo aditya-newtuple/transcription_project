@@ -8,7 +8,12 @@ from fastapi import HTTPException, UploadFile
 from common.models import BatchStatus, JobStatus
 from jobs.db_models import JobModelService, Job
 from jobs.models.request import CreateJobRequest, FileUploadInfo
-from jobs.models.response import JobResponse, JobWithFilesResponse
+from jobs.models.response import (
+    FilterParams,
+    JobResponse,
+    JobWithFilesResponse,
+    PaginatedJobResponse,
+)
 from files.db_models import FileModelService, File  # Added File import
 from files.models.request import CreateFileRequest
 from transcriber.manager import TranscriberServiceManager
@@ -42,8 +47,8 @@ class JobManager:
         # Set up base directories
         # In Docker, the base path is /app/backend
         # In local dev, it's the current working directory
-        if os.path.exists('/app/backend'):
-            self.base_path = Path('/app/backend')
+        if os.path.exists(str(os.environ.get("WORKSPACE_ROOT"))):
+            self.base_path = Path(str(os.environ.get("WORKSPACE_ROOT")))
         else:
             self.base_path = Path.cwd().resolve()
             if self.base_path.name == 'src':
@@ -294,37 +299,14 @@ class JobManager:
                         version=1,
                         text_content=txt_content,
                         srt_content=srt_content,
-                        language_hint="en",
+                        language_hint=transcription_info.language,
                         transcription_process_duration=actual_transcription_duration,
                         transcription_model=self.transcriber_service.get_model_name(),
                         message="Transcription completed successfully with both TXT and SRT formats"
                     )
 
-                    transcript = self.transcript_model_service.create_transcript(transcript_request, created_by)
-                    
-                    # Update transcript with additional metadata using the update function
-                    if transcript:
-                        # Update transcript with additional metadata
-                        updated_transcript = self.transcript_model_service.update_transcript_metadata(
-                            transcript_id=transcript.id,
-                            duration=actual_transcription_duration,
-                            model=self.transcriber_service.get_model_name(),
-                            language="en",
-                            message=f"Transcription completed successfully."
-                        )
-                        
-                        if updated_transcript:
-                            logger.info(f"Transcript metadata updated successfully for transcript {transcript.id}")
-                        else:
-                            logger.warning(f"Failed to update transcript metadata for transcript {transcript.id}")
-                        
-                        # Update file with transcription metadata
-                        self.file_model_service.update_transcription_metadata(
-                            file_id=file_id,
-                            tags=f"audio,transcription"
-                        )
-                        
-                    
+                    self.transcript_model_service.create_transcript(transcript_request, created_by)
+
                     logger.info(f"Transcript record created for file {file_id} with both formats and metadata")
 
                 except Exception as transcript_error:
@@ -375,9 +357,13 @@ class JobManager:
         sort_by: Optional[str] = None,
         sort_direction: Optional[str] = "desc",
         page_size: int = 10,
-        page_number: int = 1
-    ) -> List[JobResponse]:
-        jobs = self.job_model_service.list_jobs(
+        page_number: int = 1,
+    ) -> PaginatedJobResponse:
+        """
+        List jobs with advanced filtering, sorting, and pagination.
+        """
+        # Fetch jobs and total count from the database service
+        jobs, total_count = self.job_model_service.list_jobs(
             created_by=created_by,
             status=status,
             file_name=file_name,
@@ -387,9 +373,26 @@ class JobManager:
             sort_by=sort_by,
             sort_direction=sort_direction,
             page_size=page_size,
-            page_number=page_number
+            page_number=page_number,
         )
-        return [JobResponse.model_validate(job.__dict__) for job in jobs]
+
+        # Create the response object
+        return PaginatedJobResponse(
+            data=[JobResponse.model_validate(job) for job in jobs],
+            page=page_number,
+            page_size=page_size,
+            total_count=total_count,
+            sort_by=sort_by,
+            order=sort_direction,
+            filters=FilterParams(
+                search_query=file_name,
+                status=status,
+                tags=tags,
+                created_by=created_by,
+                date_from=str(date_from) if date_from else None,
+                date_to=str(date_to) if date_to else None,
+            ),
+        )
 
     def update_job_status(self, job_id: int, status: BatchStatus) -> Optional[JobResponse]:
         job = self.job_model_service.update_job_status(job_id, status)

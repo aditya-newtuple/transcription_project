@@ -104,29 +104,6 @@ class TranscriptModelService:
         except DBException as e:
             raise DBException(f"Could not create transcript due to {e}")
 
-    def update_transcript_metadata(self, transcript_id: int, duration: int = None, model: str = None, language: str = None, message: str = None) -> Optional[Transcript]:
-        """Update transcript metadata after transcription completion."""
-        try:
-            with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
-                transcript = db.query(Transcript).filter(Transcript.id == transcript_id).first()
-                if not transcript:
-                    return None
-
-                if duration is not None:
-                    transcript.transcription_process_duration = duration
-                if model is not None:
-                    transcript.transcription_model = model
-                if language is not None:
-                    transcript.language_hint = language
-                if message is not None:
-                    transcript.message = message
-
-                db.commit()
-                db.refresh(transcript)
-                return transcript
-        except DBException as e:
-            raise DBException(f"Could not update transcript metadata due to {e}")
-
     def get_transcript(self, transcript_id: int) -> Optional[Transcript]:
         try:
             with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:

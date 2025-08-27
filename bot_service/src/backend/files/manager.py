@@ -3,7 +3,7 @@ from datetime import datetime
 from common.models import JobStatus
 from files.db_models import FileModelService
 from files.models.request import CreateFileRequest
-from files.models.response import FileResponse, FileWithTranscriptsResponse
+from files.models.response import FileResponse, FileWithTranscriptsResponse, PaginatedFileResponse, FilterParams
 from jobs.manager import JobManager
 
 class FileManager:
@@ -47,8 +47,8 @@ class FileManager:
         sort_direction: Optional[str] = None,
         page_size: int = 10,
         page_number: int = 1
-    ) -> List[FileResponse]:
-        files = self.file_model_service.list_files(
+    ) -> PaginatedFileResponse:
+        files, total_count = self.file_model_service.list_files(
             job_id=job_id,
             status=status,
             file_name=file_name,
@@ -60,7 +60,22 @@ class FileManager:
             page_size=page_size,
             page_number=page_number
         )
-        return [FileResponse.model_validate(file.__dict__) for file in files]
+        return PaginatedFileResponse(
+            data=[FileResponse.model_validate(file.__dict__) for file in files],
+            page=page_number,
+            page_size=page_size,
+            total_count=total_count,
+            sort_by=sort_by,
+            order=sort_direction,
+            filters=FilterParams(
+                search_query=file_name,
+                status=status,
+                tags=tags,
+                created_by=None,
+                date_from=str(date_from) if date_from else None,
+                date_to=str(date_to) if date_to else None,
+            ),
+        )
 
     def update_file_status(self, file_id: int, status: JobStatus, message: Optional[str] = None) -> Optional[FileResponse]:
         file = self.file_model_service.update_file_status(file_id, status, message)

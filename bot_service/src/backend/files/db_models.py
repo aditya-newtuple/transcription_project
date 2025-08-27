@@ -135,23 +135,6 @@ class FileModelService:
         except DBException as e:
             raise DBException(f"Could not update file paths due to {e}")
 
-    def update_transcription_metadata(self, file_id: int, tags: Optional[str] = None) -> Optional[File]:
-        """Update only transcription-related metadata without changing file paths or basic info."""
-        try:
-            with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
-                file = db.query(File).filter(File.id == file_id).first()
-                if not file:
-                    return None
-
-                if tags is not None:
-                    file.tags = tags
-
-                db.commit()
-                db.refresh(file)
-                return file
-        except DBException as e:
-            raise DBException(f"Could not update transcription metadata due to {e}")
-
     def get_file(self, file_id: int) -> Optional[File]:
         try:
             with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
@@ -185,7 +168,7 @@ class FileModelService:
         sort_direction: Optional[str] = None,
         page_size: int = 10,
         page_number: int = 1
-    ) -> List[File]:
+    ) -> (List[File], int):
         try:
             with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
                 query = db.query(File)
@@ -218,7 +201,9 @@ class FileModelService:
                 else:
                     query = query.order_by(File.created_at.desc())
 
-                return query.offset((page_number - 1) * page_size).limit(page_size).all()
+                files = query.offset((page_number - 1) * page_size).limit(page_size).all()
+                total_count = len(files)
+                return files, total_count
         except DBException as e:
             raise DBException(f"Could not list files due to {e}")
 

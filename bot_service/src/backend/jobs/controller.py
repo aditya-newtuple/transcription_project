@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 
 from common.models import BatchStatus
 from jobs.manager import JobManager
-from jobs.models.response import JobResponse, JobWithFilesResponse
+from jobs.models.response import JobResponse, JobWithFilesResponse, PaginatedJobResponse
 
 
 class JobsRestController:
@@ -57,7 +57,7 @@ class JobsRestController:
                 raise HTTPException(status_code=404, detail="Job not found")
             return job
 
-        @app.get("/jobs", tags=["jobs"], response_model=List[JobResponse])
+        @app.get("/jobs", tags=["jobs"], response_model=PaginatedJobResponse)
         def list_jobs(
             created_by: Optional[int] = Query(default=None, description="Filter by user ID"),
             status: Optional[BatchStatus] = Query(default=None, description="Filter by job status"),

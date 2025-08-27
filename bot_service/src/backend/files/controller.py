@@ -11,7 +11,7 @@ from auth.deps import get_current_user
 from common.models import JobStatus
 from files.manager import FileManager
 from files.models.request import CreateFileRequest
-from files.models.response import FileResponse, FileStatusResponse, FileWithTranscriptsResponse
+from files.models.response import FileResponse, FileStatusResponse, FileWithTranscriptsResponse, PaginatedFileResponse
 
 
 class FilesRestController():
@@ -33,7 +33,7 @@ class FilesRestController():
                 )
             return file
 
-        @app.get("/files", tags=["files"], response_model=List[FileResponse])
+        @app.get("/files", tags=["files"], response_model=PaginatedFileResponse)
         def list_files(
             job_id: Optional[int] = Query(default=None, description="Filter by job ID"),
             status: Optional[JobStatus] = Query(default=None, description="Filter by job status"),
@@ -45,7 +45,7 @@ class FilesRestController():
             sort_direction: Optional[str] = Query(default="desc", description="Sort direction: 'asc' or 'desc'"),
             page_size: int = Query(default=10, ge=1, le=50, description="Number of files to return"),
             page_number: int = Query(default=1, ge=1, description="Page number to return"),
-        ) -> List[FileResponse]:
+        ) -> PaginatedFileResponse:
             """
             List files with search, filtering, sorting, and pagination.
             """

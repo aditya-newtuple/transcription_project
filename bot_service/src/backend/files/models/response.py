@@ -27,6 +27,31 @@ class FileResponse(BaseModel):
         from_attributes = True
         orm_mode = True
 
+class FilterParams(BaseModel):
+    search_query: Optional[str] = None # search query
+    status: Optional[JobStatus] = None
+    tags: Optional[List[str]] = None
+    created_by: Optional[int] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        orm_mode = True
+
+class PaginatedFileResponse(BaseModel):
+    data: List[FileResponse]
+    page: int
+    page_size: int
+    total_count: int
+    sort_by: Optional[str] = None
+    order: Optional[str] = "desc"
+    filters: FilterParams
+
+    class Config:
+        from_attributes = True
+        orm_mode = True
+
 
 class FileStatusResponse(BaseModel):
     status: JobStatus

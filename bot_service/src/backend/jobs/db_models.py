@@ -117,7 +117,7 @@ class JobModelService:
         sort_direction: Optional[str] = "desc",
         page_size: int = 10,
         page_number: int = 1
-    ) -> List[Job]:
+    ) -> (List[Job], int):
         try:
             with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
                 from files.db_models import File  # Import here to avoid circular import
@@ -156,7 +156,10 @@ class JobModelService:
                 else:
                     query = query.order_by(Job.created_at.desc())
 
-                return query.distinct().offset((page_number - 1) * page_size).limit(page_size).all()
+                jobs = query.distinct().offset((page_number - 1) * page_size).limit(page_size).all()
+                # relevant count for pagination
+                total_count = len(jobs)
+                return jobs, total_count
         except DBException as e:
             raise DBException(f"Could not list jobs due to {e}")
 
