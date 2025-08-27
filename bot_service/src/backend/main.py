@@ -140,6 +140,6 @@ if __name__ == "__main__":
         host=config_env.server_configuration.host,
         port=int(config_env.server_configuration.port),
         timeout_keep_alive=7200,
-        reload=False,                     # ensure no reloader in Docker
+        reload=True,                     # ensure no reloader in Docker
         log_level="info",
     )

@@ -19,6 +19,7 @@ class JobResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        orm_mode = True
 
 
 class JobWithFilesResponse(JobResponse):
@@ -31,3 +32,7 @@ class JobWithFilesResponse(JobResponse):
     finished_at: Optional[datetime]
     message: Optional[str]
     files: List[FileResponse]
+
+    class Config:
+        from_attributes = True
+        orm_mode = True

@@ -159,17 +159,66 @@ class FileModelService:
         except DBException as e:
             raise DBException(f"Could not get file due to {e}")
 
-    def list_files(self, job_id: Optional[int] = None, status: Optional[JobStatus] = None, page_size: int = 10) -> List[File]:
+    # def list_files(self, job_id: Optional[int] = None, status: Optional[JobStatus] = None, page_size: int = 10) -> List[File]:
+    #     try:
+    #         with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
+    #             query = db.query(File)
+    #             if job_id is not None:
+    #                 query = query.filter(File.job_id == job_id)
+    #             if status is not None:
+    #                 query = query.filter(File.status == status)
+                
+    #             # Return latest files first with pagination
+    #             return query.order_by(File.queued_at.desc()).limit(page_size).all()
+    #     except DBException as e:
+    #         raise DBException(f"Could not list files due to {e}")
+
+    def list_files(
+        self,
+        job_id: Optional[int] = None,
+        status: Optional[JobStatus] = None,
+        file_name: Optional[str] = None,
+        tags: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        sort_by: Optional[str] = None,
+        sort_direction: Optional[str] = None,
+        page_size: int = 10,
+        page_number: int = 1
+    ) -> List[File]:
         try:
             with self.current_db.get_custom_db_contxt_session(self.current_db_engine) as db:
                 query = db.query(File)
+                
                 if job_id is not None:
                     query = query.filter(File.job_id == job_id)
                 if status is not None:
                     query = query.filter(File.status == status)
-                
-                # Return latest files first with pagination
-                return query.order_by(File.queued_at.desc()).limit(page_size).all()
+                if file_name is not None:
+                    query = query.filter(File.file_name.like(f"%{file_name}%"))
+                if tags is not None:
+                    query = query.filter(File.tags.like(f"%{tags}%"))
+                if date_from is not None:
+                    query = query.filter(File.created_at >= date_from)
+                if date_to is not None:
+                    query = query.filter(File.created_at <= date_to)
+                if sort_by is not None:
+                    if sort_by == "file_name":
+                        query = query.order_by(File.file_name.asc() if sort_direction == "asc" else File.file_name.desc())
+                    elif sort_by == "status":
+                        query = query.order_by(File.status.asc() if sort_direction == "asc" else File.status.desc())
+                    elif sort_by == "created_at":
+                        query = query.order_by(File.created_at.asc() if sort_direction == "asc" else File.created_at.desc())
+                    elif sort_by == "queued_at":
+                        query = query.order_by(File.queued_at.asc() if sort_direction == "asc" else File.queued_at.desc())
+                    elif sort_by == "started_at":
+                        query = query.order_by(File.started_at.asc() if sort_direction == "asc" else File.started_at.desc())
+                    elif sort_by == "finished_at":
+                        query = query.order_by(File.finished_at.asc() if sort_direction == "asc" else File.finished_at.desc())
+                else:
+                    query = query.order_by(File.created_at.desc())
+
+                return query.offset((page_number - 1) * page_size).limit(page_size).all()
         except DBException as e:
             raise DBException(f"Could not list files due to {e}")
 

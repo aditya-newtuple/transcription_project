@@ -193,7 +193,7 @@ class JobManager:
                 job_id=job.id,
             )
             file = self.file_model_service.create_file(file_request, created_by)
-            
+
             # Update file paths with absolute path and additional metadata
             file = self.file_model_service.update_file_paths(
                 file_id=file.id,
@@ -209,7 +209,7 @@ class JobManager:
 
         # Update job status to QUEUED since files are queued for processing
         updated_job = self.job_model_service.update_job_status(job.id, BatchStatus.QUEUED)
-        return JobResponse.from_orm(updated_job)
+        return JobResponse.model_validate(updated_job.__dict__)
 
     def queue_file_for_transcription(self, file_id: int, created_by: int, source_path: str) -> None:
         """Queue a file for transcription processing."""
@@ -362,22 +362,45 @@ class JobManager:
         job = self.job_model_service.get_job(job_id)
         if not job:
             return None
-        return JobWithFilesResponse.from_orm(job)
+        return JobWithFilesResponse.model_validate(job.__dict__)
 
-    def list_jobs(self, created_by: Optional[int] = None, status: Optional[BatchStatus] = None, page_size: int = 10) -> List[JobResponse]:
-        jobs = self.job_model_service.list_jobs(created_by, status, page_size)
-        return [JobResponse.from_orm(job) for job in jobs]
+    def list_jobs(
+        self,
+        created_by: Optional[int] = None,
+        status: Optional[BatchStatus] = None,
+        file_name: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_direction: Optional[str] = "desc",
+        page_size: int = 10,
+        page_number: int = 1
+    ) -> List[JobResponse]:
+        jobs = self.job_model_service.list_jobs(
+            created_by=created_by,
+            status=status,
+            file_name=file_name,
+            tags=tags,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            page_size=page_size,
+            page_number=page_number
+        )
+        return [JobResponse.model_validate(job.__dict__) for job in jobs]
 
     def update_job_status(self, job_id: int, status: BatchStatus) -> Optional[JobResponse]:
         job = self.job_model_service.update_job_status(job_id, status)
         if not job:
             return None
-        return JobResponse.from_orm(job)
+        return JobResponse.model_validate(job.__dict__)
 
     def update_job_counts(self, job_id: int) -> Optional[JobResponse]:
         """Update job status based on its files' statuses."""
         job = self.job_model_service.update_job_counts(job_id)
         if not job:
             return None
-        return JobResponse.from_orm(job)
+        return JobResponse.model_validate(job.__dict__)
 

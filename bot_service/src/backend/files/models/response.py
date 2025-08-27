@@ -25,6 +25,7 @@ class FileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        orm_mode = True
 
 
 class FileStatusResponse(BaseModel):
@@ -54,4 +55,4 @@ class FileWithTranscriptsResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
+        orm_mode = True
