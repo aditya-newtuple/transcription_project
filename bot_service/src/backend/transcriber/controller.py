@@ -14,8 +14,8 @@ class TranscriberRestController:
     ALLOWED_EXTENSIONS = {".mp3", ".mp4", ".mpeg", ".mpeg4"}
 
     def __init__(self,
-        transcriber_manager: Optional[TranscriberServiceManager],  # may be None; prefer DI
-        get_transcriber_dep: Optional[Callable[[Request], TranscriberServiceManager]] = None,
+        transcriber_manager: Optional[TranscriberServiceManager]  # may be None; prefer DI
+        # get_transcriber_dep: Optional[Callable[[Request], TranscriberServiceManager]] = None,
     ) -> None:
         """
         Initialize the transcriber REST controller.
@@ -24,7 +24,7 @@ class TranscriberRestController:
             transcriber_service_manager: Service manager for transcription operations
         """
         self.transcriber_service_manager = transcriber_manager
-        self.get_transcriber_dep = get_transcriber_dep
+        # self.get_transcriber_dep = get_transcriber_dep
         
         # Initialize directory paths
         workspace_root = Path.cwd().resolve()
@@ -69,7 +69,8 @@ class TranscriberRestController:
         Args:
             app: FastAPI router instance to register routes on
         """
-        provider = self.get_transcriber_dep or self._require_transcriber_from_state
+        # provider = self.get_transcriber_dep or self._require_transcriber_from_state
+        provider = self._require_transcriber_from_state
         TranscriberDep = Annotated[TranscriberServiceManager, Depends(provider)]
 
         @app.post(

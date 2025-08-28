@@ -6,7 +6,6 @@ from typing import List, Optional
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, Text, and_, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from common.logger import logger
 from common.models import TranscriptFormat
 from database.manager import Base, DatabaseServiceManager
 from exceptions.db import DBException

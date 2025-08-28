@@ -8,7 +8,7 @@ from argparse import ArgumentParser
 import uvicorn
 from auth.manager import AuthManager
 from common.configuration import Configuration
-from common.logger import _logger_instance, logger
+from common.logger import logger
 from database.manager import DatabaseServiceManager, Base
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI
@@ -76,9 +76,9 @@ except BaseException as e:
 # Initialize transcriber service with configuration from environment
 transcriber_service_manager = TranscriberServiceManager(config_env.transcriber_configuration)
 
-# --- Define a dependency that returns the singleton ---
-def get_transcriber() -> TranscriberServiceManager:
-    return transcriber_service_manager
+# # --- Define a dependency that returns the singleton ---
+# def get_transcriber() -> TranscriberServiceManager:
+#     return transcriber_service_manager
 
 user_db_model_service = UserModelService(database_service_manager)
 user_service_manager = UserServiceManager(user_db_model_service, config)
@@ -86,8 +86,8 @@ user_rest_controller = UserRestController(user_service_manager, database_service
 user_rest_controller.prepare(app_router)
 
 transcriber_rest_controller = TranscriberRestController(
-    transcriber_manager=transcriber_service_manager,                 
-    get_transcriber_dep=get_transcriber,     
+    transcriber_manager=transcriber_service_manager               
+    # get_transcriber_dep=get_transcriber,     
 )
 transcriber_rest_controller.prepare(app_router)
 
